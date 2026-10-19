@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.tmp
+.claude/
+# personal runtime data lives in %APPDATA%/%LOCALAPPDATA%\UniRGB, never in the repo
+*.log
+*.bin

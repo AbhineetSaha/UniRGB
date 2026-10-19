@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UniRGB Control Center</title>
+<style>
+:root{
+  --bg:#0e1014; --panel:#161920; --panel2:#1c2029; --line:#262b36; --text:#e7e9ee; --muted:#8a91a1;
+  --accent:#7c6cff; --accent2:#5ad1c4; --ok:#3ecf8e; --warn:#f2b84b; --bad:#ff6b6b; --info:#6cb6ff;
+  --radius:12px; --shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 8px 24px rgba(0,0,0,.25);
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root{ --bg:#f4f5f8; --panel:#fff; --panel2:#f7f8fb; --line:#e3e6ec; --text:#171a21; --muted:#5e6575;
+    --shadow:0 1px 2px rgba(0,0,0,.05), 0 6px 20px rgba(0,0,0,.05); color-scheme:light; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;display:grid;grid-template-columns:300px 1fr;grid-template-rows:56px 1fr 34px;grid-template-areas:"top top" "side main" "foot foot"}
+button,input,select{font:inherit;color:inherit}
+header{grid-area:top;display:flex;align-items:center;gap:16px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:.2px}
+.logo{width:26px;height:26px;border-radius:8px;background:conic-gradient(from 200deg,#ff5f6d,#ffc371,#5ad1c4,#7c6cff,#ff5f6d)}
+.brand small{color:var(--muted);font-weight:500}
+.spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:7px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:border-color .15s,background .15s}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.ghost{background:transparent}
+.btn.danger:hover{border-color:var(--bad);color:var(--bad)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+aside{grid-area:side;border-right:1px solid var(--line);overflow:auto;padding:14px 10px;background:var(--panel)}
+.group-title{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:14px 10px 6px;display:flex;justify-content:space-between}
+.dev{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;cursor:pointer;border:1px solid transparent}
+.dev:hover{background:var(--panel2)}
+.dev.sel{background:var(--panel2);border-color:var(--line)}
+.dev .ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--line);flex:none}
+.dev.sel .ic{border-color:var(--accent)}
+.dev .meta{min-width:0;flex:1}
+.dev .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:550}
+.dev .sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.dot.connected{background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 20%,transparent)}
+.dot.monitor-only{background:var(--info)}
+.dot.unavailable{background:var(--muted)}
+.dot.error{background:var(--bad)}
+.swatch-mini{width:12px;height:12px;border-radius:4px;border:1px solid var(--line);flex:none}
+main{grid-area:main;overflow:auto;padding:22px 26px}
+.empty{color:var(--muted);text-align:center;margin-top:18vh}
+.dhead{display:flex;align-items:flex-start;gap:16px;margin-bottom:18px}
+.dhead h1{font-size:22px;margin:0 0 4px;font-weight:650}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--panel2)}
+.chip.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,var(--line))}
+.chip.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,var(--line))}
+.chip.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.chip.info{color:var(--info);border-color:color-mix(in srgb,var(--info) 40%,var(--line))}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin:0 0 12px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.row{display:flex;align-items:center;gap:12px;margin:10px 0}
+.row label{min-width:86px;color:var(--muted)}
+.colorbox{display:flex;align-items:center;gap:10px}
+input[type=color]{width:46px;height:34px;padding:0;border:1px solid var(--line);border-radius:9px;background:none;cursor:pointer}
+input[type=color]::-webkit-color-swatch-wrapper{padding:3px}
+input[type=color]::-webkit-color-swatch{border:none;border-radius:6px}
+input.hex{width:96px;padding:7px 9px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);font-family:ui-monospace,Consolas,monospace}
+input[type=range]{flex:1;accent-color:var(--accent)}
+.swatches{display:flex;gap:6px;flex-wrap:wrap}
+.sw{width:24px;height:24px;border-radius:7px;border:1px solid rgba(255,255,255,.15);cursor:pointer}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{border:0;background:var(--panel2);padding:7px 14px;cursor:pointer}
+.seg button.on{background:var(--accent);color:#fff}
+.toggle{display:inline-flex;align-items:center;gap:8px;color:var(--muted);cursor:pointer;user-select:none}
+.zone{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px dashed var(--line)}
+.zone:first-of-type{border-top:0}
+.zone .zn{flex:1}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:500}
+.s-supported{color:var(--ok)} .s-experimental{color:var(--warn)} .s-untested{color:var(--warn)}
+.s-blocked{color:var(--bad)} .s-unsupported{color:var(--muted)}
+ul.notes{margin:0;padding-left:18px;color:var(--muted)} ul.notes li{margin:4px 0}
+code,.mono{font-family:ui-monospace,Consolas,monospace;font-size:12px}
+.statebox{display:flex;gap:10px;align-items:center}
+.big-sw{width:38px;height:38px;border-radius:10px;border:1px solid var(--line)}
+.banner{border:1px solid color-mix(in srgb,var(--warn) 50%,var(--line));background:color-mix(in srgb,var(--warn) 8%,var(--panel));padding:10px 14px;border-radius:10px;margin-bottom:16px;color:var(--text)}
+footer{grid-area:foot;border-top:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 16px;font-size:12px;color:var(--muted);background:var(--panel);overflow:hidden;white-space:nowrap}
+.hchip{display:inline-flex;align-items:center;gap:6px}
+#toasts{position:fixed;right:18px;bottom:48px;display:flex;flex-direction:column;gap:8px;z-index:20}
+.toast{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--info);padding:10px 14px;border-radius:10px;box-shadow:var(--shadow);max-width:420px;animation:in .2s ease}
+.toast.bad{border-left-color:var(--bad)} .toast.ok{border-left-color:var(--ok)}
+@keyframes in{from{transform:translateY(6px);opacity:0}}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--text);max-width:900px;width:90vw;padding:0}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+.dlg-h{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+.dlg-b{padding:14px 18px;max-height:70vh;overflow:auto}
+.scene{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.scene:first-child{border-top:0}
+.scene .nm{flex:1;font-weight:550}
+.muted{color:var(--muted)}
+@media (max-width:820px){body{grid-template-columns:1fr;grid-template-rows:56px auto 1fr 34px;grid-template-areas:"top" "side" "main" "foot"} aside{max-height:36vh;border-right:0;border-bottom:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo"></div>UniRGB <small id="ver"></small></div>
+  <div class="spacer"></div>
+  <span class="muted" id="syncLabel">All controllable</span>
+  <input type="color" id="syncColor" value="#7c6cff" title="Color for every controllable device">
+  <button class="btn" id="syncBtn" title="Apply this color to every controllable device">Sync all</button>
+  <button class="btn" id="scenesBtn">Scenes</button>
+  <button class="btn ghost" id="diagBtn">Diagnostics</button>
+  <button class="btn ghost" id="rescanBtn" title="Re-run discovery">Rescan</button>
+  <button class="btn ghost danger" id="quitBtn" title="Release all devices to their vendor apps and stop UniRGB">Quit</button>
+</header>
+
+<aside id="side"></aside>
+<main id="main"><div class="empty">Discovering devices…</div></main>
+<footer id="foot"></footer>
+<div id="toasts"></div>
+
+<dialog id="scenesDlg">
+  <div class="dlg-h"><strong>Scenes</strong><button class="btn ghost" data-close>Close</button></div>
+  <div class="dlg-b">
+    <p class="muted" style="margin-top:0">A scene saves the color you last asked for on each controllable device. It is stored locally in <span class="mono" id="scenePath"></span>.</p>
+    <div class="row"><input class="hex" style="flex:1;width:auto" id="sceneName" placeholder="Scene name, e.g. Night">
+      <button class="btn primary" id="sceneSave">Save current</button></div>
+    <div id="sceneList"></div>
+    <div class="row" style="margin-top:16px">
+      <a class="btn" id="sceneExport" href="/api/scenes/export" download>Export JSON</a>
+      <label class="btn">Import JSON<input type="file" id="sceneImport" accept="application/json" hidden></label>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="diagDlg">
+  <div class="dlg-h"><strong>Diagnostics</strong><button class="btn ghost" data-close>Close</button></div>
+  <div class="dlg-b" id="diagBody"></div>
+</dialog>
+
+<script>
+const TOKEN = "__UNIRGB_TOKEN__";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let S = null, sel = null, showShadowed = false, live = true;
+const draft = {};   // per-device unsent edits
+
+const ICONS = {
+  mouse:'<path d="M12 3a5 5 0 0 1 5 5v8a5 5 0 0 1-10 0V8a5 5 0 0 1 5-5zm0 3v3"/>',
+  keyboard:'<rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 11h.01M11 11h.01M15 11h.01M8 14h8"/>',
+  motherboard:'<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8" y="8" width="8" height="8"/><path d="M2 9h2M2 15h2M20 9h2M20 15h2"/>',
+  memory:'<rect x="3" y="7" width="18" height="9" rx="1"/><path d="M7 16v3M12 16v3M17 16v3M7 10v3M11 10v3M15 10v3"/>',
+  gpu:'<rect x="2" y="6" width="20" height="11" rx="2"/><circle cx="9" cy="11.5" r="3"/><path d="M15 10h4M15 13h4"/>',
+  audio:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  "lighting-link":'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  cooler:'<circle cx="12" cy="12" r="8"/><path d="M12 4v4M12 16v4M4 12h4M16 12h4"/><circle cx="12" cy="12" r="2"/>',
+  other:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l2 2"/>'
+};
+const icon = c => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS[c]||ICONS.other}</svg>`;
+
+function toast(msg, kind="info"){
+  const t = document.createElement("div"); t.className = `toast ${kind}`; t.textContent = msg;
+  $("#toasts").appendChild(t); setTimeout(() => t.remove(), kind === "bad" ? 7000 : 3500);
+}
+async function api(method, path, body, raw=false){
+  const opt = {method, headers:{"X-UniRGB-Token": TOKEN}};
+  if (body !== undefined){ opt.headers["Content-Type"] = raw ? "text/plain" : "application/json"; opt.body = raw ? body : JSON.stringify(body); }
+  const r = await fetch(path, opt);
+  let data = {}; try { data = await r.json(); } catch {}
+  if (!r.ok && !data.message) data.message = data.error || `HTTP ${r.status}`;
+  data._ok = r.ok; return data;
+}
+const devPath = id => `/api/devices/${encodeURIComponent(id)}`;
+
+async function refresh(){
+  try { S = await api("GET", "/api/state"); } catch { $("#foot").textContent = "Lost connection to UniRGB backend."; return; }
+  if (!sel || !S.devices.find(d => d.info.id === sel)) {
+    const ctl = S.devices.filter(d => d.caps.writable && d.connection === "connected" && !d.shadowed_by);
+    const first = ctl.find(d => d.caps.color === "supported" && d.info.adapter !== "sim") || ctl[0] || S.devices[0];
+    sel = first && first.info.id;
+  }
+  render();
+}
+
+function groupOf(d){
+  if (d.connection === "unavailable" || d.connection === "error") return "Unavailable";
+  if ((d.caps.writable || d.caps.display === "supported") && !d.shadowed_by) return "Controllable";
+  return "Monitor only";
+}
+function curColor(d){ const s = d.confirmed || d.desired; return s && (s.mode === "off" ? "#000000" : s.color); }
+
+function renderSide(){
+  const groups = {"Controllable":[], "Monitor only":[], "Unavailable":[]};
+  const hidden = S.devices.filter(d => d.shadowed_by).length;
+  S.devices.filter(d => showShadowed || !d.shadowed_by).forEach(d => groups[groupOf(d)].push(d));
+  let h = "";
+  for (const [g, list] of Object.entries(groups)){
+    if (!list.length) continue;
+    h += `<div class="group-title"><span>${g}</span><span>${list.length}</span></div>`;
+    for (const d of list){
+      const c = curColor(d);
+      h += `<div class="dev ${d.info.id===sel?"sel":""}" data-id="${esc(d.info.id)}">
+        <div class="ic">${icon(d.info.category)}</div>
+        <div class="meta"><div class="nm">${esc(d.info.name)}</div>
+        <div class="sub">${esc(d.info.vendor || d.info.adapter)}${d.info.vidpid ? " · " + esc(d.info.vidpid) : ""}${d.shadowed_by ? " · duplicate" : ""}</div></div>
+        ${c ? `<span class="swatch-mini" style="background:${esc(c)}"></span>` : ""}
+        <span class="dot ${esc(d.connection)}" title="${esc(d.connection)}"></span></div>`;
+    }
+  }
+  h += `<div class="group-title" style="margin-top:18px"><label class="toggle"><input type="checkbox" id="shadowT" ${showShadowed?"checked":""}> Show ${hidden} duplicate entr${hidden===1?"y":"ies"}</label><span></span></div>`;
+  $("#side").innerHTML = h;
+  $("#side").querySelectorAll(".dev").forEach(el => el.onclick = () => { sel = el.dataset.id; render(); });
+  $("#shadowT").onchange = e => { showShadowed = e.target.checked; renderSide(); };
+}
+
+const SUPPORT_LABEL = {supported:"Supported", experimental:"Experimental", untested:"Untested", blocked:"Blocked", unsupported:"Not available"};
+const sup = v => `<span class="s-${v}">${SUPPORT_LABEL[v] || v}</span>`;
+
+function stateDraft(d){
+  if (!draft[d.info.id]){
+    const s = d.desired || {};
+    draft[d.info.id] = {mode: s.mode || "static", color: s.color || "#7c6cff", brightness: s.brightness ?? 100, zones: {...(s.zones || {})}};
+  }
+  return draft[d.info.id];
+}
+
+function displayCard(d){
+  return `<div class="card" id="dispCard"><h2>Temperature display</h2><div id="dispBody" class="muted">Loading…</div></div>`;
+}
+async function loadDisplay(d){
+  const s = await api("GET", devPath(d.info.id) + "/status");
+  const box = $("#dispBody"); if (!box || !s.settings) return;
+  const L = s.last || {}, r = L.reading, st = s.settings;
+  const opt = (v, cur, label) => `<option value="${v}" ${v===cur?"selected":""}>${label}</option>`;
+  box.className = "";
+  box.innerHTML = `
+    <div class="statebox" style="margin-bottom:10px"><div class="big-sw" style="display:grid;place-items:center;font:600 18px ui-monospace,Consolas,monospace;background:var(--panel2)">${L.sent ?? "--"}</div>
+      <div><div>${r ? `${esc(r.label)}: <b>${r.celsius} °C</b>` : "No reading yet"}</div>
+      <div class="muted" style="font-size:12px">${L.error ? `<span style="color:var(--bad)">${esc(L.error)}</span>` : (L.at ? "sent " + new Date(L.at*1000).toLocaleTimeString() : "")}</div></div></div>
+    <div class="row"><label>Display</label><label class="toggle"><input type="checkbox" id="dEn" ${st.enabled?"checked":""}> On</label></div>
+    <div class="row"><label>Source</label><select id="dSrc" class="hex" style="width:auto">${opt("auto",st.source,"Auto (CPU if available, else GPU)")}${opt("cpu",st.source,"CPU only")}${opt("gpu",st.source,"GPU only")}</select></div>
+    <div class="row"><label>Unit</label><div class="seg"><button data-unit="c" class="${st.fahrenheit?"":"on"}">°C</button><button data-unit="f" class="${st.fahrenheit?"on":""}">°F</button></div></div>
+    <div class="row"><label>Above 84 °C</label><select id="dAb" class="hex" style="width:auto">${opt("cap84",st.anti_blink,"Hold at 84 (no flashing)")}${opt("compress",st.anti_blink,"Compress 75–100 into 75–84")}${opt("raw",st.anti_blink,"Raw (panel flashes at 85+)")}</select></div>
+    ${st.confirmed ? "" : `<div class="banner">UniRGB has not sent anything to this USB device yet. Its chip (5131:2007) is also used by relay boards and other gadgets. <button class="btn primary" id="dConfirm" style="margin-left:8px">Yes, this is my cooler display</button></div>`}
+    <div class="row"><label>CPU source</label>${s.lhm.running ? `<span class="chip ok">LibreHardwareMonitor connected</span>` : `<span class="chip warn">LibreHardwareMonitor not running</span> <span class="muted" style="font-size:12px">Open source: enable Options → Remote Web Server (port 8085)</span>`}</div>
+    ${s.lhm.fans.length ? `<div class="row" style="align-items:flex-start"><label>Fans</label><div>${s.lhm.fans.map(f => `<div>${esc(f.name)}: <b>${f.rpm}</b> RPM</div>`).join("")}<div class="muted" style="font-size:12px">Read-only, from LibreHardwareMonitor</div></div></div>` : ""}
+    <div class="row" style="margin-top:14px;gap:8px">
+      ${s.lhm.running ? "" : s.cpu_helper.running ? `<span class="chip ok">AMD Ryzen Master helper running</span>` :
+        s.cpu_helper.amd_cli_installed ? `<button class="btn" id="dHelper" title="Optional. AMD's SDK is proprietary and installed separately; UniRGB only calls it if you click this (one UAC prompt)">Use AMD Ryzen Master instead (admin prompt)</button>` : ""}
+    </div>`;
+  const send = async body => { const r2 = await api("POST", devPath(d.info.id) + "/configure", body); if (!r2._ok) toast(r2.message, "bad"); loadDisplay(d); };
+  $("#dConfirm")?.addEventListener("click", () => send({confirmed: true}));
+  $("#dEn").onchange = e => send({enabled: e.target.checked});
+  $("#dSrc").onchange = e => send({source: e.target.value});
+  $("#dAb").onchange = e => send({anti_blink: e.target.value});
+  document.querySelectorAll("[data-unit]").forEach(b => b.onclick = () => send({fahrenheit: b.dataset.unit === "f"}));
+  $("#dHelper")?.addEventListener("click", async () => { const r2 = await api("POST", devPath(d.info.id) + "/cpu-helper"); toast(r2.message, r2._ok ? "ok" : "bad"); setTimeout(() => loadDisplay(d), 4000); });
+}
+
+function mouseCard(){ return `<div class="card"><h2>Mouse settings</h2><div id="mouseBody" class="muted">Reading from the mouse…</div></div>`; }
+async function loadMouse(d){
+  const s = await api("GET", devPath(d.info.id) + "/status");
+  const box = $("#mouseBody"); if (!box) return;
+  if (!s.mouse){ box.innerHTML = esc(s.error || "Mouse not answering"); return; }
+  const m = s.mouse; box.className = "";
+  box.innerHTML = `
+    <div class="row"><label>Battery</label><span><b>${m.battery_pct}%</b>${m.charging ? " · charging" : ""} <span class="muted">(warns at ${m.low_battery_pct}%)</span></span></div>
+    <div class="row" style="align-items:flex-start"><label>DPI stages</label><div>${m.stages.map((st, i) => `
+      <div class="row" style="margin:4px 0"><label class="toggle" style="min-width:0"><input type="radio" name="mStage" value="${i+1}" ${m.active_stage===i+1?"checked":""}> ${i+1}</label>
+      <input class="hex" type="number" min="100" max="30000" step="50" data-stage="${i}" value="${st[0]}" style="width:100px"></div>`).join("")}
+      <div class="muted" style="font-size:12px">Current DPI: ${m.dpi[0]}${m.dpi[1]!==m.dpi[0]?" × "+m.dpi[1]:""}</div></div></div>
+    <div class="row"><label>Polling</label><select id="mPoll" class="hex" style="width:auto">${s.poll_choices.map(h => `<option value="${h}" ${h===m.poll_hz?"selected":""}>${h} Hz</option>`).join("")}</select></div>
+    <div class="row"><label>Sleep after</label><select id="mIdle" class="hex" style="width:auto">${[60,120,180,300,600,900].map(v => `<option value="${v}" ${v===m.idle_s?"selected":""}>${v/60} min</option>`).join("")}${[60,120,180,300,600,900].includes(m.idle_s)?"":`<option selected value="${m.idle_s}">${m.idle_s} s</option>`}</select></div>
+    <div class="row" style="margin-top:14px;gap:8px"><button class="btn primary" id="mSave">Save to mouse</button><button class="btn danger" id="mRestore" title="Put back the settings that were on the mouse when UniRGB first read it">Restore originals</button></div>`;
+  const post = async body => { const r = await api("POST", devPath(d.info.id) + "/configure", body); toast(r.message, r._ok ? "ok" : "bad"); loadMouse(d); };
+  $("#mSave").onclick = () => {
+    const stages = [...document.querySelectorAll("[data-stage]")].map(i => [+i.value, +i.value]);
+    const active = +(document.querySelector('input[name="mStage"]:checked')?.value || 1);
+    post({stages, active_stage: active, poll_hz: +$("#mPoll").value, idle_s: +$("#mIdle").value});
+  };
+  $("#mRestore").onclick = () => post({restore_baseline: true});
+}
+
+function controlsCard(d){
+  const c = d.caps, st = stateDraft(d);
+  if (c.display === "supported" && !d.shadowed_by) return displayCard(d);
+  if (d.shadowed_by) return `<div class="card"><h2>Control</h2><p class="muted">This hardware is controlled through <b>${esc(d.shadowed_by)}</b>. Use that entry instead.</p></div>`;
+  if (!c.writable) return `<div class="card"><h2>Control</h2><p class="muted">Read-only. UniRGB has no verified, safe way to write to this device. The reasons are listed under Notes.</p></div>`;
+  const disabled = d.connection !== "connected" ? "disabled" : "";
+  const sw = ["#ff3b30","#ff9500","#ffd60a","#34c759","#00c7be","#0a84ff","#5e5ce6","#bf5af2","#ffffff","#000000"];
+  let zones = "";
+  if (c.zones.length && ["supported","experimental","untested"].includes(c.zone_control)){
+    zones = `<div style="margin-top:14px"><div class="row" style="margin-bottom:4px"><label>Zones</label><span class="chip ${c.zone_control==="supported"?"ok":"warn"}">${SUPPORT_LABEL[c.zone_control]}</span></div>` +
+      c.zones.map(z => {
+        const on = z.id in st.zones;
+        return `<div class="zone"><label class="toggle zn"><input type="checkbox" data-zt="${esc(z.id)}" ${on?"checked":""}> ${esc(z.name)}${z.led_count>1?` <span class="muted">(${z.led_count})</span>`:""}</label>
+        <input type="color" data-zc="${esc(z.id)}" value="${esc(st.zones[z.id] || st.color)}" ${on?"":"disabled"}></div>`;
+      }).join("") + `<p class="muted" style="font-size:12px;margin:6px 0 0">Unticked zones use the main color.</p></div>`;
+  }
+  return `<div class="card"><h2>Lighting <label class="toggle" style="text-transform:none;letter-spacing:0"><input type="checkbox" id="liveT" ${live?"checked":""}> Live</label></h2>
+    ${c.effects.length > 1 ? `<div class="row"><label>Mode</label><div class="seg">${c.effects.map(e => `<button data-mode="${e}" class="${st.mode===e?"on":""}">${e[0].toUpperCase()+e.slice(1)}</button>`).join("")}</div></div>` : ""}
+    <div class="row"><label>Color</label><div class="colorbox"><input type="color" id="cPick" value="${esc(st.color)}" ${disabled}><input class="hex" id="cHex" value="${esc(st.color)}" maxlength="7" ${disabled}></div></div>
+    <div class="row"><label></label><div class="swatches">${sw.map(x => `<span class="sw" data-sw="${x}" style="background:${x}" title="${x}"></span>`).join("")}</div></div>
+    ${["supported","experimental","untested"].includes(c.brightness) ? `<div class="row"><label>Brightness</label><input type="range" id="bri" min="0" max="100" value="${st.brightness}" ${disabled}><span class="mono" id="briV" style="width:38px;text-align:right">${st.brightness}%</span></div>
+    ${c.brightness_native ? "" : `<div class="row" style="margin-top:-6px"><label></label><span class="muted" style="font-size:12px">Done by scaling the color. This control path has no hardware brightness setting.</span></div>`}` : ""}
+    ${zones}
+    <div class="row" style="margin-top:16px;gap:8px">
+      <button class="btn primary" id="applyBtn" ${disabled}>Apply</button>
+      ${["supported","experimental"].includes(c.restore) ? `<button class="btn danger" id="restoreBtn" ${disabled} title="Give the device back to its original owner (for Razer: ends the Chroma session so Synapse takes over again)">${d.info.adapter === "sim" ? "Restore" : "Return to vendor app"}</button>` : ""}
+    </div></div>`;
+}
+
+function stateCard(d){
+  const sw = s => s ? `<div class="statebox"><div class="big-sw" style="background:${s.mode==="off"?"#000":esc(s.color||"transparent")}"></div><div><div>${esc(s.mode)}${s.color?" · <span class='mono'>"+esc(s.color)+"</span>":""}</div><div class="muted" style="font-size:12px">brightness ${s.brightness}%${Object.keys(s.zones||{}).length?" · zones: "+Object.entries(s.zones).map(([k,v])=>esc(k)+" "+esc(v)).join(", "):""}</div></div></div>` : `<span class="muted">—</span>`;
+  const conf = d.info.adapter === "sim" && d.confirmation === "hardware-readback" ? ["warn","Simulated read-back"] : {"hardware-readback":["ok","Read back from hardware"],"api-accepted":["warn","Accepted by vendor API (LEDs not observed)"],"none":["","Not confirmed"]}[d.confirmation] || ["",d.confirmation];
+  return `<div class="card" id="stateCard"><h2>State</h2>
+    <table><tr><th style="width:110px">Requested</th><td>${sw(d.desired)}</td></tr>
+    <tr><th>Confirmed</th><td>${sw(d.confirmed)}<div style="margin-top:6px"><span class="chip ${conf[0]}">${conf[1]}</span></div></td></tr>
+    ${d.last_error ? `<tr><th>Last error</th><td style="color:var(--bad)">${esc(d.last_error)}</td></tr>` : ""}
+    </table></div>`;
+}
+
+function capsCard(d){
+  const c = d.caps;
+  const rows = [["Discovery",c.discovery],["Display",c.display],["Read state",c.read_state],["Color",c.color],["Brightness",c.brightness],["Zones",c.zone_control],["Effect speed",c.speed],["Fan control",c.fan_control],["Restore",c.restore]];
+  return `<div class="card"><h2>Capabilities</h2><table>${rows.map(([k,v]) => `<tr><th>${k}</th><td>${sup(v)}</td></tr>`).join("")}
+    <tr><th>Effects</th><td>${c.effects.length ? esc(c.effects.join(", ")) : "<span class='muted'>—</span>"}</td></tr></table></div>`;
+}
+
+function infoCard(d){
+  const i = d.info;
+  return `<div class="card"><h2>Evidence &amp; notes</h2>
+    <table><tr><th style="width:110px">Control path</th><td class="mono">${esc(i.connection_path || "—")}</td></tr>
+    <tr><th>Owned by</th><td>${i.controlled_by.length ? esc(i.controlled_by.join(", ")) : "<span class='muted'>—</span>"}</td></tr>
+    <tr><th>Device id</th><td class="mono">${esc(i.id)}</td></tr></table>
+    <h2 style="margin-top:14px">Evidence</h2><ul class="notes">${i.evidence.map(e => `<li>${esc(e)}</li>`).join("") || "<li>—</li>"}</ul>
+    <h2 style="margin-top:14px">Notes</h2><ul class="notes">${d.caps.notes.map(n => `<li>${esc(n)}</li>`).join("") || "<li>—</li>"}</ul></div>`;
+}
+
+function renderMain(){
+  const d = S.devices.find(x => x.info.id === sel);
+  if (!d){ $("#main").innerHTML = `<div class="empty">No devices found.</div>`; return; }
+  const connChip = {connected:["ok","Connected"],"monitor-only":["info","Monitor only"],unavailable:["","Unavailable"],error:["bad","Error"]}[d.connection];
+  const sim = d.info.adapter === "sim";
+  $("#main").innerHTML = `
+    ${sim ? `<div class="banner"><b>Simulated device.</b> Nothing here touches real hardware.</div>` : ""}
+    <div class="dhead"><div class="dev" style="padding:0;cursor:default"><div class="ic" style="width:48px;height:48px">${icon(d.info.category)}</div></div>
+      <div style="flex:1"><h1>${esc(d.info.name)}</h1>
+      <div class="chips"><span class="chip ${connChip[0]}">${connChip[1]}</span>
+        ${d.info.vendor ? `<span class="chip">${esc(d.info.vendor)}</span>` : ""}
+        ${d.info.vidpid ? `<span class="chip mono">${esc(d.info.vidpid)}</span>` : ""}
+        <span class="chip">${esc(d.info.category)}</span><span class="chip">adapter: ${esc(d.info.adapter)}</span>
+        ${["experimental","untested"].includes(d.caps.color) ? `<span class="chip warn">${d.caps.color} control</span>` : ""}
+        ${d.shadowed_by ? `<span class="chip warn">duplicate of ${esc(d.shadowed_by)}</span>` : ""}</div></div></div>
+    <div class="grid">${controlsCard(d)}${d.info.adapter === "razer-hid" && d.connection === "connected" ? mouseCard() : ""}${d.caps.writable && !d.shadowed_by ? stateCard(d) : ""}${capsCard(d)}${infoCard(d)}</div>`;
+  wireControls(d);
+  if (d.caps.display === "supported" && !d.shadowed_by) loadDisplay(d);
+  if (d.info.adapter === "razer-hid" && d.connection === "connected") loadMouse(d);
+}
+
+let sendTimer = null, inflight = false, queued = false;
+function scheduleSend(d, immediate=false){
+  if (!live && !immediate) return;
+  clearTimeout(sendTimer);
+  sendTimer = setTimeout(() => send(d), immediate ? 0 : 40);
+}
+async function send(d){
+  if (inflight){ queued = true; return; }
+  inflight = true;
+  const st = stateDraft(d);
+  const body = {state:{mode:st.mode, color:st.color, brightness:st.brightness, zones:st.zones}};
+  if (!["supported","experimental","untested"].includes(d.caps.brightness)) body.state.brightness = 100;
+  const r = await api("POST", devPath(d.info.id) + "/apply", body);
+  inflight = false;
+  if (!r._ok) toast(`${d.info.name}: ${r.message}`, "bad");
+  if (queued){ queued = false; return send(d); }
+  softRefresh();
+}
+let softT = null;
+function softRefresh(){ clearTimeout(softT); softT = setTimeout(async () => { S = await api("GET","/api/state"); renderSide(); const d = S.devices.find(x=>x.info.id===sel); if (d) { const box = document.getElementById("stateCard"); if (box) box.outerHTML = stateCard(d); } }, 150); }
+
+function wireControls(d){
+  const st = stateDraft(d);
+  const setColor = (v, push=true) => { st.color = v; const p=$("#cPick"), h=$("#cHex"); if(p) p.value=v; if(h) h.value=v; document.querySelectorAll("[data-zc]").forEach(z => { if (z.disabled) z.value = v; }); if (push) scheduleSend(d); };
+  $("#cPick")?.addEventListener("input", e => setColor(e.target.value));
+  $("#cHex")?.addEventListener("change", e => { const v = e.target.value.trim(); if (/^#?[0-9a-f]{6}$/i.test(v)) setColor(v[0]==="#"?v.toLowerCase():"#"+v.toLowerCase()); else toast("Use a hex color like #33aaff", "bad"); });
+  document.querySelectorAll("[data-sw]").forEach(s => s.onclick = () => setColor(s.dataset.sw));
+  $("#bri")?.addEventListener("input", e => { st.brightness = +e.target.value; $("#briV").textContent = st.brightness + "%"; scheduleSend(d); });
+  document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { st.mode = b.dataset.mode; document.querySelectorAll("[data-mode]").forEach(x => x.classList.toggle("on", x===b)); scheduleSend(d, true); });
+  document.querySelectorAll("[data-zt]").forEach(t => t.onchange = () => { const id = t.dataset.zt, ci = document.querySelector(`[data-zc="${CSS.escape(id)}"]`); ci.disabled = !t.checked; if (t.checked) st.zones[id] = ci.value; else delete st.zones[id]; scheduleSend(d); });
+  document.querySelectorAll("[data-zc]").forEach(ci => ci.addEventListener("input", () => { st.zones[ci.dataset.zc] = ci.value; scheduleSend(d); }));
+  $("#liveT")?.addEventListener("change", e => live = e.target.checked);
+  $("#applyBtn")?.addEventListener("click", () => scheduleSend(d, true));
+  $("#restoreBtn")?.addEventListener("click", async () => {
+    const r = await api("POST", devPath(d.info.id) + "/restore");
+    toast(r.message || (r._ok ? "Restored" : "Restore failed"), r._ok ? "ok" : "bad");
+    for (const k of Object.keys(draft)) if (k.startsWith(d.info.adapter + ":")) delete draft[k];
+    refresh();
+  });
+}
+
+function renderFoot(){
+  const h = Object.entries(S.health).map(([n, x]) => `<span class="hchip" title="${esc(x.detail)}"><span class="dot ${x.available?"connected":"unavailable"}"></span>${esc(n)}</span>`).join("");
+  const t = S.last_scan ? new Date(S.last_scan*1000).toLocaleTimeString() : "—";
+  $("#foot").innerHTML = `${h}<span class="spacer"></span><span>last scan ${t} (${S.last_scan_ms} ms)</span>${S.simulate?'<span class="chip warn">simulation on</span>':""}`;
+  $("#ver").textContent = "v" + S.version;
+}
+
+function render(){ renderSide(); renderMain(); renderFoot(); }
+
+// ---------- header actions ----------
+$("#rescanBtn").onclick = async () => { $("#rescanBtn").disabled = true; S = await api("POST","/api/rescan"); $("#rescanBtn").disabled = false; render(); toast("Discovery finished", "ok"); };
+$("#syncBtn").onclick = async () => {
+  const color = $("#syncColor").value;
+  const targets = S.devices.filter(d => d.caps.writable && !d.shadowed_by && d.connection === "connected");
+  if (!targets.length) return toast("No controllable devices", "bad");
+  const res = await Promise.all(targets.map(d => { const st = stateDraft(d); st.mode = "static"; st.color = color; st.zones = {};
+    return api("POST", devPath(d.info.id) + "/apply", {state:{mode:"static", color, brightness: ["supported","experimental","untested"].includes(d.caps.brightness) ? st.brightness : 100}}).then(r => [d, r]); }));
+  const bad = res.filter(([, r]) => !r._ok);
+  toast(bad.length ? `Applied to ${res.length - bad.length}/${res.length}. ${bad.map(([d, r]) => d.info.name + ": " + r.message).join("; ")}` : `Applied to ${res.length} device(s)`, bad.length ? "bad" : "ok");
+  refresh();
+};
+$("#quitBtn").onclick = async () => {
+  const r = await api("POST", "/api/quit");
+  document.body.innerHTML = `<div style="grid-column:1/-1;grid-row:1/-1;display:grid;place-items:center;color:var(--muted)">${esc(r.message || "UniRGB stopped.")}<br>You can close this window.</div>`;
+};
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => b.closest("dialog").close());
+
+function renderScenes(){
+  $("#scenePath").textContent = S.scene_store.path;
+  const names = Object.keys(S.scenes).sort();
+  $("#sceneList").innerHTML = (S.scene_store.load_error ? `<div class="banner">${esc(S.scene_store.load_error)}</div>` : "") +
+    (names.length ? names.map(n => `<div class="scene"><span class="nm">${esc(n)}</span><span class="muted">${Object.keys(S.scenes[n]).length} device(s)</span>
+      <button class="btn" data-apply="${esc(n)}">Apply</button><button class="btn danger" data-del="${esc(n)}">Delete</button></div>`).join("") : `<p class="muted">No scenes yet.</p>`);
+  document.querySelectorAll("[data-apply]").forEach(b => b.onclick = async () => {
+    const r = await api("POST", `/api/scenes/${encodeURIComponent(b.dataset.apply)}/apply`);
+    if (!r._ok) return toast(r.message, "bad");
+    const bad = Object.entries(r.results).filter(([, x]) => !x.ok);
+    toast(bad.length ? `Scene partly applied: ${bad.map(([k, x]) => k + ": " + x.message).join("; ")}` : "Scene applied", bad.length ? "bad" : "ok");
+    Object.keys(draft).forEach(k => delete draft[k]); await refresh(); renderScenes();
+  });
+  document.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { await api("DELETE", `/api/scenes/${encodeURIComponent(b.dataset.del)}`); await refresh(); renderScenes(); });
+}
+$("#scenesBtn").onclick = () => { renderScenes(); $("#scenesDlg").showModal(); };
+$("#sceneSave").onclick = async () => {
+  const name = $("#sceneName").value.trim();
+  const r = await api("POST", "/api/scenes", {name, capture:true});
+  if (!r._ok) return toast(r.message, "bad");
+  toast(`Saved "${name}"`, "ok"); $("#sceneName").value = ""; await refresh(); renderScenes();
+};
+$("#sceneImport").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = await api("POST", "/api/scenes/import", await f.text(), true);
+  toast(r._ok ? `Imported ${r.imported.length} scene(s)` : r.message, r._ok ? "ok" : "bad"); e.target.value = ""; await refresh(); renderScenes();
+};
+$("#diagBtn").onclick = async () => {
+  const r = await api("GET", "/api/diagnostics");
+  $("#diagBody").innerHTML = `<h3 style="margin-top:0">Adapters</h3><table><tr><th>Adapter</th><th>Up</th><th>Detail</th><th>Control path</th></tr>
+    ${Object.entries(r.health).map(([n, h]) => `<tr><td>${esc(n)}</td><td>${h.available?"yes":"no"}</td><td>${esc(h.detail)}</td><td class="mono">${esc(S.adapters[n]?.control_path)}</td></tr>`).join("")}</table>
+    <h3>HID collections (query-only)</h3>${r.hid_error ? `<p style="color:var(--bad)">${esc(r.hid_error)}</p>` : ""}
+    <table><tr><th>VID:PID</th><th>MI</th><th>Usage</th><th>In/Out/Feat</th><th>Manufacturer / product</th></tr>
+    ${r.hid.map(i => `<tr><td class="mono">${esc(i.vidpid)}</td><td>${i.interface_number ?? ""}</td><td class="mono">${i.usage_page!=null ? i.usage_page.toString(16).toUpperCase().padStart(4,"0")+":"+i.usage.toString(16).toUpperCase().padStart(4,"0") : "?"}</td><td>${i.input_len}/${i.output_len}/${i.feature_len}</td><td>${esc([i.manufacturer, i.product].filter(Boolean).join(" / "))}</td></tr>`).join("")}</table>`;
+  $("#diagDlg").showModal();
+};
+
+refresh();
+setInterval(() => { if (!document.hidden && !inflight) api("GET","/api/state").then(x => { S = x; renderSide(); renderFoot(); }); }, 5000);
+</script>
+</body>
+</html>
