@@ -46,6 +46,16 @@ UniRGB never bundles third-party or proprietary software. See [docs/open-source.
 
 Details: [docs/security-and-safety.md](docs/security-and-safety.md) · [docs/direct-control.md](docs/direct-control.md).
 
+## Build a Windows .exe
+
+```bash
+pip install pyinstaller
+tools\build-windows.cmd
+```
+
+This produces `dist\UniRGB.exe`, a single file that runs without Python. Windows only: on Linux and macOS
+UniRGB has no device backends yet.
+
 ## Develop
 
 ```bash

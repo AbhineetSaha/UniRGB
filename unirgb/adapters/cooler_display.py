@@ -206,10 +206,13 @@ class CoolerDisplayAdapter(DeviceAdapter):
         if sys.platform != "win32":
             return ApplyResult(False, message="Windows only")
         exe = Path(sys.executable)
-        pyw = exe.with_name("pythonw.exe")
-        root = Path(__file__).resolve().parents[2]
-        args = f'-m unirgb.cpu_temp_helper --parent {os.getpid()}'
-        rc = ctypes.windll.shell32.ShellExecuteW(None, "runas", str(pyw if pyw.exists() else exe), args, str(root), 0)
+        if getattr(sys, "frozen", False):   # packaged UniRGB.exe: no `python -m`, relaunch ourselves
+            prog, args, root = exe, f"--cpu-helper --parent {os.getpid()}", exe.parent
+        else:
+            pyw = exe.with_name("pythonw.exe")
+            prog, args, root = (pyw if pyw.exists() else exe), f"-m unirgb.cpu_temp_helper --parent {os.getpid()}", \
+                Path(__file__).resolve().parents[2]
+        rc = ctypes.windll.shell32.ShellExecuteW(None, "runas", str(prog), args, str(root), 0)
         if rc <= 32:
             return ApplyResult(False, message="UAC prompt was declined or the helper could not start")
         return ApplyResult(True, message="CPU sensor helper started; the display switches to CPU within a few seconds")

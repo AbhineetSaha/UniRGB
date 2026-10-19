@@ -5,3 +5,6 @@ __pycache__/
 # personal runtime data lives in %APPDATA%/%LOCALAPPDATA%\UniRGB, never in the repo
 *.log
 *.bin
+build/
+dist/
+*.spec
