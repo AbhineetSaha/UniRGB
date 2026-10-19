@@ -155,9 +155,6 @@ def make_server(app, host: str = "127.0.0.1", port: int = 0) -> ThreadingHTTPSer
                     raise ApiError(404, "device has no CPU helper")
                 res = adapter.start_cpu_helper()
                 return (200 if res.ok else 409), {"ok": res.ok, "message": res.message}
-            if method == "GET" and action == "read":
-                st = app.orch.read_state(dev)
-                return 200, {"state": st.to_dict() if st else None}
         if p == ["scenes"] and method == "POST":
             body = h._body()
             if not isinstance(body, dict):

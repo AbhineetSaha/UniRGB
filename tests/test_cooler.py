@@ -113,6 +113,11 @@ class AdapterTests(unittest.TestCase):
         self.assertTrue(self.a.configure("cooler:5131:2007", {"confirmed": True}).ok)
         self.assertEqual(self.sent[-1][2], 40)
 
+    def test_shutdown_blanks_the_panel(self):
+        self.make()
+        self.a.shutdown()
+        self.assertEqual(self.sent[-1], antcooler.build_blank(), "no frozen temperature after quit")
+
     def test_write_error_recovers(self):
         self.make()
         calls = {"n": 0}

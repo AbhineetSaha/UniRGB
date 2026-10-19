@@ -134,6 +134,9 @@ class MsiDirectAdapter(DeviceAdapter):
         # keep the first baseline ever captured: a later read could already be UniRGB's own setup
         if self.baseline_path.exists():
             return
+        r = msi761.row(setup, 0)
+        if r[0] == 0x09 and r[14] == 0x15:   # UniRGB's own direct-mode setup, not MSI's original
+            return
         self.baseline_path.parent.mkdir(parents=True, exist_ok=True)
         self.baseline_path.write_bytes(setup[:msi761.SETUP_LEN])
 

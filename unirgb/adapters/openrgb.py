@@ -222,7 +222,8 @@ class OpenRGBAdapter(DeviceAdapter):
             for zi, z in enumerate(ctl["zones"]):
                 zones.append((f"z{zi}", z["name"], start, z["leds_count"]))
                 start += z["leds_count"]
-            self._ctrl[dev_id] = {"index": idx, "zones": zones, "leds": len(ctl["leds"]), "name": ctl["name"]}
+            self._ctrl[dev_id] = {"index": idx, "zones": zones, "leds": len(ctl["leds"]), "name": ctl["name"],
+                                  "location": ctl["location"]}
             has_direct = any(md["name"].lower() in ("direct", "custom", "static") for md in ctl["modes"])
             notes = ["OpenRGB does the hardware writes (for RAM: over SMBus through the PawnIO driver). You chose "
                      "this path knowing a bad SMBus write can damage a module; UniRGB itself sends only colors to OpenRGB.",
@@ -258,7 +259,13 @@ class OpenRGBAdapter(DeviceAdapter):
             return ApplyResult(False, message="controller not present in OpenRGB")
         with self._lock:
             try:
-                self._conn().set_leds(info["index"], self._colors_for(info, state))
+                c = self._conn()
+                # OpenRGB addresses controllers by list position, which shifts when its device list changes
+                now = c.controller(info["index"])
+                if (now["name"], now["location"]) != (info["name"], info["location"]):
+                    self._ctrl = {}
+                    return ApplyResult(False, message="OpenRGB's device list changed; press Rescan")
+                c.set_leds(info["index"], self._colors_for(info, state))
             except (OSError, ConnectionError, ValueError) as e:
                 self._drop()
                 return ApplyResult(False, message=f"OpenRGB: {e}")

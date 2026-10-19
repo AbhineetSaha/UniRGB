@@ -149,6 +149,15 @@ class OpenRGBTests(unittest.TestCase):
         self.assertEqual((size, n), (len(body), 5))
         self.assertEqual(colors, (0x0000FF,) + (0x00FF00,) * 4)
 
+    def test_apply_refuses_when_openrgb_list_shifted(self):
+        dev = self.a.discover()[0].info.id            # index 0 = MSI MYSTIC LIGHT
+        self.fake.controllers.reverse()                # OpenRGB reorders its list
+        r = self.a.apply(dev, LightingState(color=RED))
+        self.assertFalse(r.ok)
+        self.assertIn("changed", r.message)
+        time.sleep(0.1)
+        self.assertNotIn(1050, [p for _, p, _ in self.fake.received], "no color write after a shift")
+
     def test_read_state(self):
         dev = self.a.discover()[0].info.id
         st = self.a.read_state(dev)

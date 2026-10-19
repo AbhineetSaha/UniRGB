@@ -35,8 +35,6 @@ def validate(state: LightingState, rec) -> str | None:
         return "static mode needs a color or zone colors"
     if state.brightness != 100 and caps.brightness not in WRITE_OK:
         return "brightness control not supported on this device"
-    if state.speed is not None and caps.speed not in WRITE_OK:
-        return "effect speed not supported on this device"
     if state.zones:
         if caps.zone_control not in WRITE_OK:
             return "per-zone control not supported on this device"
@@ -184,17 +182,6 @@ class Orchestrator:
             return self.adapters[rec.info.adapter].status(device_id)
         except Exception as e:
             return {"error": str(e)}
-
-    def read_state(self, device_id: str) -> LightingState | None:
-        rec = self.registry.get(device_id)
-        if rec is None:
-            return None
-        adapter = self.adapters[rec.info.adapter]
-        fut = self._exec[adapter.name].submit(adapter.read_state, device_id)
-        try:
-            return fut.result(timeout=self.op_timeout)
-        except Exception:
-            return None
 
     @staticmethod
     def _safe(fn, *a) -> ApplyResult:

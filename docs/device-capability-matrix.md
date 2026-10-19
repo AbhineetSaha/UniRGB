@@ -17,7 +17,7 @@ verified color. See the open questions in `reverse-engineering-findings.md`.
 | MSI Mystic Light controller 0DB0:0076 (`msi`) | S | B | B | B | B | B (zones listed from MSI log) | B | – | – | – | n/a |
 | DDR5 DIMMs (`inventory`) | S | B | B | B | B | – | – | – | – | – | n/a |
 | Gigabyte RTX 5070 Ti (`inventory`) | S | B | B | B | B | – | – | – | – | – | n/a |
-| Kreo Hive RGB 320F:5055 (`inventory`) | S | B | B | B | B | B | B | – | – | – | n/a |
+| Kreo Hive RGB 320F:5055, direct HID (`kreo-hid`) | S (capabilities read) | – | E (device ack) | E (software scaling) | static, off: E | – | – | – | S | S (end direct mode) | S (reverts by itself within 0.2 s) |
 | USB microphone 31B2:0011 (`inventory`) | S | – | – | – | – | – | – | – | – | – | n/a |
 | Any OpenRGB controller (`openrgb`) | U | U | U | U (software scaling) | static, off: U | U | – | – | U | – | n/a |
 | `[SIM]` devices (`sim`, only with `--simulate`) | S* | S* | S* | S* | S* | S* | – | – | S* | S* | n/a |
@@ -45,4 +45,3 @@ Direct-control evidence: see [direct-control.md](direct-control.md).
 | MSI controller | No official SDK installed. The direct 761-byte HID protocol is community-reverse-engineered, and MSI's service writes the same controller (contention) |
 | DDR5 (`inventory` entry) | UniRGB has no SMBus code. RAM colors go through the `openrgb` adapter (RAM only) by user decision |
 | GPU | I²C writes are outside UniRGB's safety boundary (assessment pending) |
-| Kreo keyboard | Undocumented vendor protocol. No read-back or ack known |

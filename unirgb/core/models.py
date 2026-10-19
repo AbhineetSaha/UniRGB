@@ -93,13 +93,10 @@ class LightingState:
     color: Color | None = None
     brightness: int = 100           # 0-100
     zones: dict[str, Color] = field(default_factory=dict)
-    speed: int | None = None        # 0-100, effect-dependent
-    extensions: dict = field(default_factory=dict)  # adapter-specific, typed by adapter
 
     def to_dict(self) -> dict:
         return {"mode": self.mode, "color": self.color.hex() if self.color else None,
-                "brightness": self.brightness, "zones": {k: c.hex() for k, c in self.zones.items()},
-                "speed": self.speed, "extensions": dict(self.extensions)}
+                "brightness": self.brightness, "zones": {k: c.hex() for k, c in self.zones.items()}}
 
     @classmethod
     def from_dict(cls, d: dict) -> "LightingState":
@@ -109,18 +106,13 @@ class LightingState:
         b = d.get("brightness", 100)
         if not is_int(b) or not 0 <= b <= 100:
             raise ValueError("brightness must be an integer 0-100")
-        s = d.get("speed")
-        if s is not None and (not is_int(s) or not 0 <= s <= 100):
-            raise ValueError("speed must be an integer 0-100")
         zones = d.get("zones")
         zones = {} if zones is None else zones
         if not isinstance(zones, dict):
             raise ValueError("zones must be an object")
         return cls(mode=str(d.get("mode", "static")),
                    color=Color.parse(d["color"]) if d.get("color") else None,
-                   brightness=b, speed=s,
-                   zones={str(k): Color.parse(v) for k, v in zones.items()},
-                   extensions=dict(d.get("extensions") or {}))
+                   brightness=b, zones={str(k): Color.parse(v) for k, v in zones.items()})
 
 
 @dataclass
@@ -141,7 +133,6 @@ class Capabilities:
     effects: list[str] = field(default_factory=list)
     zones: list[Zone] = field(default_factory=list)
     zone_control: Support = Support.UNSUPPORTED
-    speed: Support = Support.UNSUPPORTED
     fan_control: Support = Support.UNSUPPORTED
     display: Support = Support.UNSUPPORTED   # e.g. a temperature readout fed by UniRGB
     restore: Support = Support.UNSUPPORTED

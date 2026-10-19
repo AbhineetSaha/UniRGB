@@ -35,18 +35,12 @@ def default_settings_path() -> Path:
 
 
 def _default_open(info):
-    from ..hostos.hid_io import HidDevice
-    return HidDevice(info)
+    from ..hostos.hid_io import HidReportDevice
+    return HidReportDevice(info)
 
 
 def _write_output(dev, data: bytes) -> None:
-    """HID output report via WriteFile on the device handle."""
-    from ctypes import wintypes
-    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    k32.WriteFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
-    n = wintypes.DWORD()
-    if not k32.WriteFile(dev._h, data, len(data), ctypes.byref(n), None) or n.value != len(data):
-        raise OSError(ctypes.get_last_error(), "WriteFile to cooler display failed")
+    dev.write(data)
 
 
 class CoolerDisplayAdapter(DeviceAdapter):
@@ -229,5 +223,7 @@ class CoolerDisplayAdapter(DeviceAdapter):
 
     def shutdown(self) -> None:
         self._stop.set()
+        if self.settings["confirmed"]:
+            self._send_blank()   # a frozen number would show a stale, too-low CPU temperature
         with self._lock:
             self._close()

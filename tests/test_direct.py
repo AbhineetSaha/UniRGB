@@ -178,6 +178,11 @@ class MsiDirectTests(unittest.TestCase):
         self.assertTrue(a.restore(d.info.id).ok)
         self.assertEqual(self.dev.sent[-1], msi_baseline())
 
+    def test_direct_mode_setup_is_never_saved_as_baseline(self):
+        self.dev.setup = msi761.build_direct_setup({"jargb1": 30})
+        self.make()
+        self.assertFalse(self.base.exists())
+
     def test_rediscovery_never_overwrites_first_baseline(self):
         a, [d] = self.make()
         a.apply(d.info.id, LightingState(color=RED))

@@ -324,7 +324,7 @@ function stateCard(d){
 
 function capsCard(d){
   const c = d.caps;
-  const rows = [["Discovery",c.discovery],["Display",c.display],["Read state",c.read_state],["Color",c.color],["Brightness",c.brightness],["Zones",c.zone_control],["Effect speed",c.speed],["Fan control",c.fan_control],["Restore",c.restore]];
+  const rows = [["Discovery",c.discovery],["Display",c.display],["Read state",c.read_state],["Color",c.color],["Brightness",c.brightness],["Zones",c.zone_control],["Fan control",c.fan_control],["Restore",c.restore]];
   return `<div class="card"><h2>Capabilities</h2><table>${rows.map(([k,v]) => `<tr><th>${k}</th><td>${sup(v)}</td></tr>`).join("")}
     <tr><th>Effects</th><td>${c.effects.length ? esc(c.effects.join(", ")) : "<span class='muted'>—</span>"}</td></tr></table></div>`;
 }

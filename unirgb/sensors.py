@@ -105,7 +105,10 @@ def decode_cli(raw: bytes) -> str:
 last_cli_output: str = ""
 
 
-def read_amd_cli(timeout: float = 20.0) -> float | None:
+_AMD_COMMANDS = [["-a", "GetPMTableData"], ["--api", "GetCurrentTemperature"]]
+
+
+def read_amd_cli(timeout: float = 8.0) -> float | None:
     """Only works in an elevated process. Read-only API call."""
     global last_cli_output
     if not AMD_CLI.exists():
@@ -113,7 +116,7 @@ def read_amd_cli(timeout: float = 20.0) -> float | None:
         return None
     # Zen 5 answers "Deprecated API. Use GetPMTableData" to GetCurrentTemperature (observed on the
     # 9800X3D); the PM-table dump prints the same "GetCurrentTemperature ... X Celsius" line.
-    for args in (["-a", "GetPMTableData"], ["--api", "GetCurrentTemperature"]):
+    for args in list(_AMD_COMMANDS):
         try:
             out = subprocess.run([str(AMD_CLI), *args], capture_output=True, stdin=subprocess.DEVNULL,
                                  timeout=timeout, creationflags=_NOWIN, cwd=str(AMD_CLI.parent))
@@ -126,6 +129,7 @@ def read_amd_cli(timeout: float = 20.0) -> float | None:
         last_cli_output = f"{args[1]} exit {out.returncode}: " + decode_cli(out.stdout + out.stderr)
         t = parse_amd_cli(last_cli_output)
         if t is not None:
+            _AMD_COMMANDS[:] = [args]   # remember the call this CPU answers; skip the dead one next time
             return t
     return None
 

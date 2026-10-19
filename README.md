@@ -26,7 +26,8 @@ python -m unirgb
 ```
 
 Or double-click `UniRGB.cmd`. The UI opens at `http://127.0.0.1:47821/` (in an Edge app window if available).
-**Quit** hands every device back to its own stored lighting. Options: `--no-direct`, `--simulate`, `--no-window`, `--port N`.
+**Quit** releases UniRGB's devices: the keyboard returns to its stored lighting by itself, the pump display is
+cleared, and other devices keep their last color. Use **Return to vendor app** on a device to restore it. Options: `--no-direct`, `--simulate`, `--no-window`, `--port N`.
 
 ## Optional companions (open source, installed separately)
 

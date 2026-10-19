@@ -31,7 +31,7 @@ class ModelTests(unittest.TestCase):
     def test_state_roundtrip_and_validation(self):
         s = LightingState(color=RED, brightness=40, zones={"a": BLUE})
         self.assertEqual(LightingState.from_dict(s.to_dict()).to_dict(), s.to_dict())
-        for bad in ({"brightness": 101}, {"brightness": "x"}, {"speed": -1}, {"zones": []}, None):
+        for bad in ({"brightness": 101}, {"brightness": "x"}, {"zones": []}, None):
             with self.assertRaises(ValueError):
                 LightingState.from_dict(bad)
 
@@ -54,7 +54,7 @@ class OrchestratorTests(unittest.TestCase):
         self.assertTrue(r.ok, r.message)
         rec = self.o.registry.get("sim:strip")
         self.assertEqual(rec.confirmed.zones["a"], BLUE)
-        self.assertEqual(self.o.read_state("sim:strip").color, RED)
+        self.assertEqual(sim.read_state("sim:strip").color, RED)
 
     def test_validation(self):
         self.o, _ = make()
@@ -63,7 +63,6 @@ class OrchestratorTests(unittest.TestCase):
             ("sim:strip", LightingState(color=None), "needs a color"),
             ("sim:strip", LightingState(color=RED, zones={"zz": RED}), "unknown zone"),
             ("sim:fan", LightingState(color=RED, zones={"a": RED}), "per-zone"),
-            ("sim:strip", LightingState(color=RED, speed=10), "speed"),
             ("nope", LightingState(color=RED), "unknown device"),
         ]
         for dev, st, msg in cases:
