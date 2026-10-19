@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>UniRGB Control Center</title>
+<link rel="icon" href="/favicon.ico">
 <style>
 :root{
   --bg:#0e1014; --panel:#161920; --panel2:#1c2029; --line:#262b36; --text:#e7e9ee; --muted:#8a91a1;
@@ -21,7 +22,7 @@ body{background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI Variable Te
 button,input,select{font:inherit;color:inherit}
 header{grid-area:top;display:flex;align-items:center;gap:16px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--panel)}
 .brand{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:.2px}
-.logo{width:26px;height:26px;border-radius:8px;background:conic-gradient(from 200deg,#ff5f6d,#ffc371,#5ad1c4,#7c6cff,#ff5f6d)}
+.logo{width:26px;height:26px}
 .brand small{color:var(--muted);font-weight:500}
 .spacer{flex:1}
 .btn{border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:7px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:border-color .15s,background .15s}
@@ -105,7 +106,7 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 </head>
 <body>
 <header>
-  <div class="brand"><div class="logo"></div>UniRGB <small id="ver"></small></div>
+  <div class="brand"><img class="logo" src="/favicon.ico" alt="">UniRGB <small id="ver"></small></div>
   <div class="spacer"></div>
   <span class="muted" id="syncLabel">All controllable</span>
   <input type="color" id="syncColor" value="#7c6cff" title="Color for every controllable device">

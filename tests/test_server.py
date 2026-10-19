@@ -51,6 +51,11 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(st, 200)
         self.assertIn(self.srv.token.encode(), body)
 
+    def test_favicon(self):
+        st, body = self.req("GET", "/favicon.ico", token=False)
+        self.assertEqual(st, 200)
+        self.assertEqual(body[:4], bytes([0, 0, 1, 0]), "ICO header")
+
     def test_state(self):
         st, body = self.req("GET", "/api/state", token=False)
         self.assertEqual(st, 200)

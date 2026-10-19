@@ -110,6 +110,8 @@ def make_server(app, host: str = "127.0.0.1", port: int = 0) -> ThreadingHTTPSer
         }
 
     def route(method, parts, h):
+        if method == "GET" and parts == ["favicon.ico"]:
+            return 200, (UI_FILE.parent / "logo.ico").read_bytes(), "image/x-icon"
         if method == "GET" and parts in ([], ["index.html"]):
             html = UI_FILE.read_text(encoding="utf-8").replace("__UNIRGB_TOKEN__", token)
             return 200, html.encode(), "text/html; charset=utf-8"

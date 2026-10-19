@@ -14,6 +14,7 @@ LicenseFile=..\LICENSE
 OutputDir=..\dist
 OutputBaseFilename=UniRGB-Setup-{#AppVersion}
 UninstallDisplayIcon={app}\UniRGB.exe
+SetupIconFile=..\unirgb\ui\logo.ico
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
