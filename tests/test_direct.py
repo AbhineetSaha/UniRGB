@@ -178,6 +178,14 @@ class MsiDirectTests(unittest.TestCase):
         self.assertTrue(a.restore(d.info.id).ok)
         self.assertEqual(self.dev.sent[-1], msi_baseline())
 
+    def test_led_counts_come_from_msi_baseline_not_live_setup(self):
+        self.make()                                              # baseline saved with 30 LEDs
+        self.dev.setup = msi761.build_direct_setup({z: 120 for z in msi761.DIRECT_ZONES})  # another tool wrote 120
+        a, [d] = self.make()
+        self.assertEqual([z.led_count for z in d.caps.zones], [30, 30, 30, 30])
+        self.assertTrue(a.apply(d.info.id, LightingState(color=RED)).ok)
+        self.assertEqual(self.dev.sent[-1][6], 30)
+
     def test_direct_mode_setup_is_never_saved_as_baseline(self):
         self.dev.setup = msi761.build_direct_setup({"jargb1": 30})
         self.make()

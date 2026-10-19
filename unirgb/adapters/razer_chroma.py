@@ -93,14 +93,14 @@ class RazerChromaAdapter(DeviceAdapter):
         self._devices: dict[str, str] = {}   # device id -> chroma endpoint
 
     # ---------- HTTP ----------
-    def _http(self, method: str, url: str, body: dict | None = None) -> dict:
+    def _http(self, method: str, url: str, body: dict | None = None, timeout: float | None = None) -> dict:
         # HTTP.sys answers 411 to a PUT/POST without Content-Length; http.client adds
         # "Content-Length: 0" for body-less PUT/POST itself (verified against RzSDKServer).
         data = json.dumps(body).encode() if body is not None else None
         req = urllib.request.Request(url, data=data, method=method,
                                      headers={"Content-Type": "application/json"})
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+            with urllib.request.urlopen(req, timeout=timeout or self.timeout) as r:
                 raw = r.read()
         except urllib.error.HTTPError as e:
             raise ChromaError(f"HTTP {e.code} from {method} {url}") from e
@@ -114,7 +114,7 @@ class RazerChromaAdapter(DeviceAdapter):
     # ---------- discovery ----------
     def health(self) -> AdapterHealth:
         try:
-            v = self._http("GET", self.base_url)
+            v = self._http("GET", self.base_url, timeout=0.5)   # "localhost" tries IPv6 then IPv4; keep scans fast when Synapse is off
             self._version = v
             return AdapterHealth(True, f"Chroma SDK {v.get('version', '?')} reachable", {"version": v})
         except ChromaError as e:

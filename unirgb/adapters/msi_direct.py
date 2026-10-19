@@ -84,7 +84,8 @@ class MsiDirectAdapter(DeviceAdapter):
         evidence = [f"HID 0DB0:0076 page FF00, feature report {h.feature_len} bytes", f"board: {board or 'unknown'}"]
         try:
             setup = self._open().get_feature(0x50)
-            self._led_counts = msi761.led_counts_from(setup)
+            # MSI's own LED counts; the live setup may hold another tool's defaults (OpenRGB writes 120)
+            self._led_counts = msi761.led_counts_from(self.baseline_path.read_bytes() if self._has_baseline() else setup)
             active = msi761.decode_setup(setup)
             evidence.append("setup read over HID (GET 0x50): " +
                             ", ".join(f"{k} mode {v['mode']} x{v['led_count']}" for k, v in active.items()))
