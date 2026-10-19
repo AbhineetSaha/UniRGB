@@ -50,10 +50,12 @@ Details: [docs/security-and-safety.md](docs/security-and-safety.md) · [docs/dir
 
 ```bash
 pip install pyinstaller
+winget install JRSoftware.InnoSetup
 tools\build-windows.cmd
 ```
 
-This produces `dist\UniRGB.exe`, a single file that runs without Python. Windows only: on Linux and macOS
+This produces `dist\UniRGB.exe`, a single file that runs without Python, and `dist\UniRGB-Setup-<version>.exe`,
+a per-user installer (no admin prompt) with Start Menu entry and uninstaller. Windows only: on Linux and macOS
 UniRGB has no device backends yet.
 
 ## Develop
