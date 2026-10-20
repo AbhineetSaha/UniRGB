@@ -497,16 +497,42 @@ function openSetup(first){
   $("#prefRam").disabled = !P.available.ram_lighting;
   $("#ramChip").textContent = P.available.ram_lighting ? "Needs driver" : "Coming soon";
   $("#ramNote").textContent = P.available.ram_lighting ? "" : "UniRGB's own RAM support can only read so far. Until it can set colors, RAM lighting keeps working through OpenRGB if you run it.";
-  const st = $("#setupStatus");
-  st.hidden = !P.needs_driver || P.driver === "running";
-  st.textContent = "PawnIO driver: " + (P.driver === "not-installed" ? "not installed. " : P.driver + ". ") + "A one-time setup with one admin prompt installs it; later starts need no prompt.";
   $("#setupDlg").showModal();
+  loadSetupStatus();
+}
+async function loadSetupStatus(){
+  const P = S.prefs, st = await api("GET", "/api/system-setup"), box = $("#setupStatus");
+  const fail = st.last_result && !st.last_result.ok ? ` Last attempt failed: ${esc(st.last_result.error)}` : "";
+  let html = "";
+  if (P.needs_driver && !st.ready)
+    html = (st.stale ? "UniRGB was updated, so its background helper needs refreshing." :
+      `One-time setup: ${P.driver === "not-installed" ? "installs the PawnIO driver and " : ""}adds UniRGB's background helper. One Windows admin prompt now, none on later starts.`) +
+      `${fail} <button class="btn primary" data-setup="1" style="margin-left:8px">Set up now</button>`;
+  else if (!P.needs_driver && (st.task || st.helper))
+    html = `UniRGB's background helper is still installed but nothing uses it.${fail} <button class="btn" data-setup="0" style="margin-left:8px">Remove it</button>`;
+  else if (P.needs_driver) html = `<span class="chip ok">Background helper ready</span>`;
+  box.hidden = !html; box.innerHTML = html;
+  box.querySelectorAll("[data-setup]").forEach(b => b.onclick = () => runSetup(b.dataset.setup === "1"));
+}
+async function runSetup(enable){
+  const r = await api("POST", "/api/system-setup", {enable});
+  toast(r.message, r._ok ? "info" : "bad");
+  if (!r._ok) return;
+  for (let i = 0; i < 30; i++){   // the elevated setup runs on its own; watch for the result
+    await new Promise(res => setTimeout(res, 2000));
+    const st = await api("GET", "/api/system-setup");
+    if (enable ? st.ready || (st.last_result && !st.last_result.ok && st.last_result.at * 1000 > Date.now() - 60000) : !st.task && !st.helper) break;
+  }
+  S = await api("GET", "/api/state"); loadSetupStatus();
 }
 $("#setupBtn").onclick = () => openSetup(false);
 $("#setupSave").onclick = async () => {
   const r = await api("POST", "/api/prefs", {setup_done: true, cpu_temperature: $("#prefCpu").checked, ram_lighting: $("#prefRam").checked});
   if (!r._ok) return toast(r.message, "bad");
-  S.prefs = r; $("#setupDlg").close(); toast("Settings saved", "ok");
+  S.prefs = r; toast("Settings saved", "ok");
+  const st = await api("GET", "/api/system-setup");
+  if ((r.needs_driver && !st.ready) || (!r.needs_driver && (st.task || st.helper))) return loadSetupStatus();   // keep the dialog open for the next step
+  $("#setupDlg").close();
 };
 $("#diagBtn").onclick = async () => {
   const r = await api("GET", "/api/diagnostics");

@@ -19,6 +19,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from .core.models import LightingState
+from . import system_setup
 from .hostos import windows_system
 
 log = logging.getLogger("unirgb.server")
@@ -131,6 +132,15 @@ def make_server(app, host: str = "127.0.0.1", port: int = 0) -> ThreadingHTTPSer
         if method == "POST" and p == ["prefs"]:
             app.prefs.update(h._body())   # ValueError -> 400 with the reason
             return 200, prefs_payload()
+        if p == ["system-setup"]:
+            if method == "GET":
+                return 200, system_setup.status(Path(sys.executable))
+            if method == "POST":
+                body = h._body()
+                if not isinstance(body, dict) or not isinstance(body.get("enable"), bool):
+                    raise ApiError(400, 'expected {"enable": true|false}')
+                ok, message = system_setup.request(body["enable"])
+                return (200 if ok else 409), {"ok": ok, "message": message}
         if method == "POST" and p == ["rescan"]:
             app.rescan(full=True)
             return 200, state_payload()

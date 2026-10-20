@@ -50,6 +50,9 @@ def main(argv=None) -> int:
     if argv[:1] == ["--cpu-helper"]:   # how the packaged .exe starts its elevated sensor helper
         from .cpu_temp_helper import main as helper_main
         return helper_main(argv[1:])
+    if argv[:1] == ["--system-setup"]:   # elevated one-time setup started from Settings
+        from .system_setup import main as setup_main
+        return setup_main(argv[1:])
     ap = argparse.ArgumentParser(prog="unirgb", description="UniRGB unified device & RGB control center")
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument("--simulate", action="store_true", help="add clearly labelled simulated devices")
