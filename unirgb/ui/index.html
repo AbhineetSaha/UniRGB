@@ -127,6 +127,7 @@ details.more summary:hover{color:var(--text)}
   <input type="color" id="syncColor" value="#7c6cff" title="Color for every controllable device">
   <button class="btn" id="syncBtn" title="Apply this color to every controllable device">Sync all</button>
   <button class="btn" id="scenesBtn">Scenes</button>
+  <button class="btn ghost" id="setupBtn">Settings</button>
   <button class="btn ghost" id="diagBtn">Diagnostics</button>
   <button class="btn ghost" id="rescanBtn" title="Re-run discovery">Rescan</button>
   <button class="btn ghost danger" id="quitBtn" title="Release all devices to their vendor apps and stop UniRGB">Quit</button>
@@ -148,6 +149,19 @@ details.more summary:hover{color:var(--text)}
       <a class="btn" id="sceneExport" href="/api/scenes/export" download>Export JSON</a>
       <label class="btn">Import JSON<input type="file" id="sceneImport" accept="application/json" hidden></label>
     </div>
+  </div>
+</dialog>
+
+<dialog id="setupDlg" style="max-width:620px">
+  <div class="dlg-h"><strong id="setupTitle">Settings</strong><button class="btn ghost" data-close>Close</button></div>
+  <div class="dlg-b">
+    <p class="muted" style="margin-top:0">Lighting works right away. The other features need UniRGB's hardware driver (PawnIO). Tick only what you want; you can change this later in Settings.</p>
+    <div class="scene"><label class="toggle nm"><input type="checkbox" checked disabled> Lighting for mouse, keyboard, motherboard and cooler</label><span class="chip ok">No driver needed</span></div>
+    <div class="scene"><label class="toggle nm"><input type="checkbox" id="prefCpu"> CPU temperature on the pump display</label><span class="chip warn">Needs driver</span></div>
+    <div class="scene"><label class="toggle nm"><input type="checkbox" id="prefRam"> RAM lighting</label><span class="chip" id="ramChip">Needs driver</span></div>
+    <p class="muted" style="font-size:12px" id="ramNote"></p>
+    <div class="banner" id="setupStatus" hidden></div>
+    <div class="row" style="justify-content:flex-end;margin-bottom:0"><button class="btn primary" id="setupSave">Save</button></div>
   </div>
 </dialog>
 
@@ -474,6 +488,26 @@ $("#sceneImport").onchange = async e => {
   const r = await api("POST", "/api/scenes/import", await f.text(), true);
   toast(r._ok ? `Imported ${r.imported.length} scene(s)` : r.message, r._ok ? "ok" : "bad"); e.target.value = ""; await refresh(); renderScenes();
 };
+function openSetup(first){
+  const P = S.prefs;
+  $("#setupTitle").textContent = first ? "Welcome to UniRGB" : "Settings";
+  $("#setupSave").textContent = first ? "Continue" : "Save";
+  $("#prefCpu").checked = P.cpu_temperature;
+  $("#prefRam").checked = P.ram_lighting;
+  $("#prefRam").disabled = !P.available.ram_lighting;
+  $("#ramChip").textContent = P.available.ram_lighting ? "Needs driver" : "Coming soon";
+  $("#ramNote").textContent = P.available.ram_lighting ? "" : "UniRGB's own RAM support can only read so far. Until it can set colors, RAM lighting keeps working through OpenRGB if you run it.";
+  const st = $("#setupStatus");
+  st.hidden = !P.needs_driver || P.driver === "running";
+  st.textContent = "PawnIO driver: " + (P.driver === "not-installed" ? "not installed. " : P.driver + ". ") + "A one-time setup with one admin prompt installs it; later starts need no prompt.";
+  $("#setupDlg").showModal();
+}
+$("#setupBtn").onclick = () => openSetup(false);
+$("#setupSave").onclick = async () => {
+  const r = await api("POST", "/api/prefs", {setup_done: true, cpu_temperature: $("#prefCpu").checked, ram_lighting: $("#prefRam").checked});
+  if (!r._ok) return toast(r.message, "bad");
+  S.prefs = r; $("#setupDlg").close(); toast("Settings saved", "ok");
+};
 $("#diagBtn").onclick = async () => {
   const r = await api("GET", "/api/diagnostics");
   $("#diagBody").innerHTML = `<h3 style="margin-top:0">Adapters</h3><table><tr><th>Adapter</th><th>Up</th><th>Detail</th><th>Control path</th></tr>
@@ -484,7 +518,7 @@ $("#diagBtn").onclick = async () => {
   $("#diagDlg").showModal();
 };
 
-refresh();
+refresh().then(() => { if (S && !S.prefs.setup_done) openSetup(true); });
 setInterval(() => { if (!document.hidden && !inflight) api("GET","/api/state").then(x => { S = x; renderSide(); renderFoot(); }); }, 5000);
 </script>
 </body>

@@ -19,6 +19,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from .core.models import LightingState
+from .hostos import windows_system
 
 log = logging.getLogger("unirgb.server")
 UI_FILE = Path(__file__).parent / "ui" / "index.html"
@@ -106,7 +107,11 @@ def make_server(app, host: str = "127.0.0.1", port: int = 0) -> ThreadingHTTPSer
             "scenes": {n: {d: s.to_dict() for d, s in devs.items()} for n, devs in app.scenes.list().items()},
             "scene_store": {"path": str(app.scenes.path), "load_error": app.scenes.load_error},
             "last_scan": app.last_scan, "last_scan_ms": round(app.last_scan_ms, 1),
+            "prefs": prefs_payload(),
         }
+
+    def prefs_payload():
+        return {**app.prefs.to_dict(), "driver": windows_system.service_state("PawnIO")}
 
     def route(method, parts, h):
         if method == "GET" and parts == ["favicon.ico"]:
@@ -123,6 +128,9 @@ def make_server(app, host: str = "127.0.0.1", port: int = 0) -> ThreadingHTTPSer
             # release device sessions, then let the main loop exit
             threading.Thread(target=app.request_quit, daemon=True).start()
             return 200, {"ok": True, "message": "UniRGB is shutting down; vendor apps take lighting back"}
+        if method == "POST" and p == ["prefs"]:
+            app.prefs.update(h._body())   # ValueError -> 400 with the reason
+            return 200, prefs_payload()
         if method == "POST" and p == ["rescan"]:
             app.rescan(full=True)
             return 200, state_payload()

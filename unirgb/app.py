@@ -21,6 +21,7 @@ from .core.models import Connection, LightingState
 from .core.orchestrator import Orchestrator
 from .core.scenes import SceneStore
 from .hostos import windows_hid, windows_system
+from .prefs import PrefsStore
 
 log = logging.getLogger("unirgb")
 VERSION = "0.1.0"
@@ -67,6 +68,7 @@ class App:
         self.orch = Orchestrator(adapters)
         self.scenes = SceneStore(scenes_path)
         self.last_path = self.scenes.path.parent / "last_state.json"
+        self.prefs = PrefsStore(self.scenes.path.parent / "prefs.json")
         self._saved_lock = threading.Lock()
         self._saved = self._load_saved()
         self.orch.on_change = self._remember
