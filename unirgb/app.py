@@ -20,6 +20,7 @@ from .adapters.simulated import SimulatedAdapter
 from .core.models import Connection, LightingState
 from .core.orchestrator import Orchestrator
 from .core.scenes import SceneStore
+from . import sensors, system_setup
 from .hostos import windows_hid, windows_system
 from .prefs import PrefsStore
 
@@ -54,6 +55,7 @@ class App:
     def __init__(self, simulate: bool = False, direct: bool = True, scenes_path: Path | None = None, openrgb_port: int = 6742,
                  adapters=None, hid_cache: HidCache | None = None, rescan_interval: float = 15.0):
         self.simulate = simulate
+        self._helper_started = float("-inf")
         self.hid = hid_cache or HidCache()
         if adapters is None:
             adapters = [RazerChromaAdapter(self.hid.get), OpenRGBAdapter(port=openrgb_port),
@@ -61,7 +63,9 @@ class App:
             if direct:
                 procs = windows_system.running_processes
                 board = lambda: ((windows_system.hardware_summary().get("board") or {}).get("Product") or "")
-                adapters = [CoolerDisplayAdapter(self.hid.get), KreoDirectAdapter(self.hid.get), RazerDirectAdapter(self.hid.get, process_provider=procs),
+                cpu = lambda: (sensors.read_hw_helper(self._start_helper) or sensors.read_lhm_cpu()
+                               or sensors.read_helper_file())
+                adapters = [CoolerDisplayAdapter(self.hid.get, cpu_reader=cpu), KreoDirectAdapter(self.hid.get), RazerDirectAdapter(self.hid.get, process_provider=procs),
                             MsiDirectAdapter(self.hid.get, process_provider=procs, board_provider=board)] + adapters
             if simulate:
                 adapters.append(SimulatedAdapter())
@@ -78,6 +82,13 @@ class App:
         self._scan_lock = threading.Lock()
         self.last_scan: float = 0.0
         self.last_scan_ms: float = 0.0
+
+    def _start_helper(self) -> None:
+        """Start the privileged helper through its task: only if the user enabled it, at most every 30 s."""
+        now = time.monotonic()
+        if self.prefs.prefs.cpu_temperature and now - self._helper_started > 30:
+            self._helper_started = now
+            system_setup.start_helper()
 
     def rescan(self, full: bool = False) -> None:
         with self._scan_lock:
