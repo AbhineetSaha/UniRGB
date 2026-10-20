@@ -1,0 +1,6 @@
+# CI lint: real errors only (syntax errors and pyflakes: undefined names, unused imports, redefinitions).
+# Style rules are left out on purpose; the code base has its own conventions.
+target-version = "py311"
+
+[lint]
+select = ["E9", "F"]

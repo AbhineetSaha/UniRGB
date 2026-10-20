@@ -14,7 +14,6 @@ import sys
 import threading
 import time
 from dataclasses import asdict
-from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
