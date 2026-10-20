@@ -1,0 +1,50 @@
+name: Release
+
+# Push a tag like v0.1.0 to build the Windows exe and installer and publish a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Check the tag matches the app and installer versions
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          grep -q "^VERSION = \"$v\"" unirgb/app.py && grep -q "AppVersion \"$v\"" installer/UniRGB.iss || {
+            echo "::error::Tag $GITHUB_REF_NAME must match VERSION in unirgb/app.py and AppVersion in installer/UniRGB.iss"; exit 1; }
+
+      - run: python -m unittest discover -s tests -t .
+
+      - name: Install build tools
+        run: |
+          pip install pyinstaller
+          choco install innosetup -y --no-progress
+
+      - name: Build
+        shell: cmd
+        run: tools\build-windows.cmd
+
+      # sha256sum fails if build-windows.cmd skipped the installer, so a release never ships without it.
+      - name: Checksums
+        shell: bash
+        working-directory: dist
+        run: sha256sum UniRGB.exe "UniRGB-Setup-${GITHUB_REF_NAME#v}.exe" > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" --title "UniRGB $GITHUB_REF_NAME" --generate-notes
+          "dist/UniRGB-Setup-${GITHUB_REF_NAME#v}.exe" dist/UniRGB.exe dist/SHA256SUMS.txt
