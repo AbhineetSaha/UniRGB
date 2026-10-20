@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0b0c10;
+  --color-surface: #12141a;
+  --color-line: #22252e;
+  --color-line-hover: #3a3e4a;
+  --color-fg: #e8e9ee;
+  --color-muted: #9a9eab;
+  --color-led-r: #ff3b30;
+  --color-led-g: #34c759;
+  --color-led-b: #0a84ff;
+  --color-ok: #34c759;
+  --color-warn: #f5b942;
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+/* The logo's red → green → blue sweep, used for stripes, glow and the hero accent. */
+@utility bg-rgb {
+  background-image: linear-gradient(90deg, var(--color-led-r), var(--color-led-g), var(--color-led-b));
+}
+@utility wrap {
+  width: min(1120px, 100% - 32px);
+  margin-inline: auto;
+}
+
+@layer base {
+  html { @apply scroll-smooth scroll-pt-18; }
+  body { @apply bg-bg text-fg font-sans leading-relaxed; }
+  h1, h2, h3 { @apply leading-tight tracking-tight; }
+  p a { @apply underline; }
+  :focus-visible { @apply outline-2 outline-offset-3 outline-led-b rounded; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+  }
+}
+
+@layer components {
+  .btn { @apply inline-flex items-center gap-2 px-5 py-3 rounded-[10px] font-semibold border border-line transition hover:border-line-hover hover:-translate-y-px; }
+  .btn-primary { @apply bg-fg text-bg border-fg hover:bg-white hover:border-fg; }
+  .eyebrow { @apply font-mono text-xs font-semibold leading-none tracking-[.14em] uppercase text-muted; }
+  .lead { @apply text-muted text-lg max-w-[60ch]; }
+  .note { @apply text-muted text-sm mt-4; }
+  .panel { @apply bg-surface border border-line rounded-xl p-5 text-sm; }
+  .row { @apply flex items-center gap-3 py-2.5 border-b border-line last:border-b-0; }
+  .tag { @apply ml-auto font-mono text-xs px-2 py-0.5 rounded-full border border-current whitespace-nowrap; }
+}
