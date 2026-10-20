@@ -1,0 +1,14 @@
+# UniRGB itself is standard-library Python, so only the workflows and the website have dependencies.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /website
+    schedule:
+      interval: weekly
+    groups:
+      website:
+        patterns: ["*"]

@@ -1,0 +1,33 @@
+name: Device support request
+description: Ask for a device UniRGB doesn't control yet
+labels: ["device request"]
+body:
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      description: Brand and exact model
+      placeholder: Razer BlackWidow V4 Pro
+    validations:
+      required: true
+  - type: input
+    id: vidpid
+    attributes:
+      label: VID:PID
+      description: Shown in UniRGB → Diagnostics
+      placeholder: "1532:028D"
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: HID collections from Diagnostics
+      description: Paste the device's section from UniRGB → Diagnostics. Read-only information only; don't send write commands to test.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: Known protocol sources
+      description: Open-source drivers (OpenRGB, openrazer, …) or documentation that already cover this device, if you know any.

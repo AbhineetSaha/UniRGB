@@ -28,3 +28,9 @@ python -m unittest discover -s tests -t .
 ```
 
 Standard library only. Add tests with fake devices (`tests/fakes.py`, `tests/test_direct.py`) for every new protocol.
+
+## Pull requests
+
+Fork the repository, work on a branch, and open a pull request against `main`. `main` is protected: every change
+goes through a pull request, CI (the test suite and the website build) must pass, and the maintainer reviews and
+merges. Security problems go to [SECURITY.md](SECURITY.md), not to public issues.
