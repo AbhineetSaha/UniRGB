@@ -70,6 +70,7 @@ class Orchestrator:
         self._breakers = {a.name: _Breaker() for a in adapters}
         self._health: dict[str, AdapterHealth] = {}
         self._closed = False
+        self.on_change = None   # callback(device_id, LightingState | None) after a confirmed apply/restore
 
     # ---------- discovery ----------
     def discover_all(self) -> dict[str, AdapterHealth]:
@@ -159,6 +160,8 @@ class Orchestrator:
             for rid in {device_id, *res.released}:
                 self.registry.update(rid, desired=None, confirmed=None,
                                      confirmation=Confirmation.NONE, last_error=None)
+                if self.on_change:
+                    self.on_change(rid, None)
         else:
             self.registry.update(device_id, last_error=res.message)
         return res
@@ -195,6 +198,8 @@ class Orchestrator:
         if res.ok:
             br.failures = 0
             self.registry.update(device_id, confirmed=res.applied, confirmation=res.confirmation, last_error=None)
+            if self.on_change and res.applied is not None:
+                self.on_change(device_id, res.applied)
         else:
             br.failures += 1
             if br.failures >= self.FAIL_THRESHOLD:

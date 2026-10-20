@@ -25,6 +25,8 @@ class DeviceRegistry:
                 rec = old.get(d.info.id)
                 if rec:
                     rec.info, rec.caps, rec.connection = d.info, d.caps, d.connection
+                    if d.connection != Connection.CONNECTED:
+                        rec.confirmed = None   # e.g. a sleeping mouse loses live colors
                     rec.updated_at = time.time()
                 else:
                     self._records[d.info.id] = DeviceRecord(d.info, d.caps, d.connection)

@@ -74,6 +74,13 @@ def main(argv=None) -> int:
     log.info("UniRGB %s starting; log at %s", VERSION, log_path)
     app.rescan(full=True)
     app.start_background()
+    if sys.platform == "win32":   # above normal, not high: lighting stays responsive without starving games
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        k32.GetCurrentProcess.restype = ctypes.c_void_p   # untyped, the 64-bit pseudo-handle is truncated
+        k32.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+        if not k32.SetPriorityClass(k32.GetCurrentProcess(), 0x8000):   # ABOVE_NORMAL_PRIORITY_CLASS
+            log.warning("could not raise process priority")
     stop = threading.Event()
     signal.signal(signal.SIGINT, lambda *_: stop.set())
     if hasattr(signal, "SIGBREAK"):

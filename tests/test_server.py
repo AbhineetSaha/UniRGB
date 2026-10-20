@@ -95,3 +95,35 @@ class ServerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LastStateTests(unittest.TestCase):
+    def test_last_color_is_reapplied_after_restart_and_reconnect(self):
+        import time
+        from unirgb.core.models import Color, LightingState
+        with tempfile.TemporaryDirectory() as d:
+            mk = lambda sim: App(adapters=[sim], hid_cache=HidCache(lambda: []), scenes_path=Path(d) / "s.json")
+            sim1 = SimulatedAdapter()
+            a = mk(sim1)
+            a.rescan()
+            self.assertTrue(a.orch.apply("sim:fan", LightingState(color=Color(1, 2, 3))).ok)
+            a.shutdown()
+
+            sim2 = SimulatedAdapter()                       # "next boot"
+            b = mk(sim2)
+            b.rescan()
+            time.sleep(0.2)
+            self.assertEqual(sim2.read_state("sim:fan").color, Color(1, 2, 3))
+
+            sim2.connected = False; b.rescan()              # device drops out ...
+            sim2.state.clear(); sim2.connected = True; b.rescan()   # ... and comes back without its colors
+            time.sleep(0.2)
+            self.assertEqual(sim2.read_state("sim:fan").color, Color(1, 2, 3))
+
+            self.assertTrue(b.orch.restore("sim:fan").ok)   # restore = forget it for next boot
+            b.shutdown()
+            c = mk(SimulatedAdapter())
+            c.rescan()
+            time.sleep(0.2)
+            self.assertIsNone(c.orch.adapters["sim"].read_state("sim:fan"))
+            c.shutdown()

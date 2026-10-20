@@ -22,6 +22,7 @@ CloseApplications=yes
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; Flags: unchecked
+Name: "autostart"; Description: "Start UniRGB in the background when I sign in"
 
 [Files]
 Source: "..\dist\UniRGB.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -39,3 +40,7 @@ Filename: "{app}\UniRGB.exe"; Description: "Start UniRGB"; Flags: nowait postins
 [UninstallRun]
 ; stop a running UniRGB so its files can be removed
 Filename: "{sys}\taskkill.exe"; Parameters: "/IM UniRGB.exe /F"; Flags: runhidden; RunOnceId: "StopUniRGB"
+
+[Registry]
+; per-user autostart, no admin; the Start Menu shortcut opens the window of the running instance
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "UniRGB"; ValueData: """{app}\UniRGB.exe"" --no-window"; Flags: uninsdeletevalue; Tasks: autostart

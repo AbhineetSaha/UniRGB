@@ -1,7 +1,9 @@
 """Composition root: wires adapters, orchestrator, scenes and the local HTTP UI."""
 from __future__ import annotations
 
+import json
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -15,6 +17,7 @@ from .adapters.openrgb import OpenRGBAdapter
 from .adapters.razer_chroma import RazerChromaAdapter
 from .adapters.razer_direct import RazerDirectAdapter
 from .adapters.simulated import SimulatedAdapter
+from .core.models import Connection, LightingState
 from .core.orchestrator import Orchestrator
 from .core.scenes import SceneStore
 from .hostos import windows_hid, windows_system
@@ -63,6 +66,10 @@ class App:
                 adapters.append(SimulatedAdapter())
         self.orch = Orchestrator(adapters)
         self.scenes = SceneStore(scenes_path)
+        self.last_path = self.scenes.path.parent / "last_state.json"
+        self._saved_lock = threading.Lock()
+        self._saved = self._load_saved()
+        self.orch.on_change = self._remember
         self.rescan_interval = rescan_interval
         self._stop = threading.Event()
         self.quit_requested = threading.Event()
@@ -77,8 +84,41 @@ class App:
             if full:
                 windows_system.hardware_summary(refresh=True)
             self.orch.discover_all()
+            self._reapply_saved()
             self.last_scan = time.time()
             self.last_scan_ms = (time.perf_counter() - t0) * 1000
+
+    def _load_saved(self) -> dict:
+        try:
+            return {k: LightingState.from_dict(v) for k, v in json.loads(self.last_path.read_text("utf-8")).items()}
+        except (OSError, ValueError, TypeError, AttributeError):
+            return {}
+
+    def _remember(self, device_id: str, state) -> None:
+        with self._saved_lock:
+            if state is None:
+                self._saved.pop(device_id, None)
+            else:
+                self._saved[device_id] = state
+            data = json.dumps({k: v.to_dict() for k, v in self._saved.items()})
+            try:
+                self.last_path.parent.mkdir(parents=True, exist_ok=True)
+                tmp = self.last_path.with_suffix(".tmp")
+                tmp.write_text(data, encoding="utf-8")
+                os.replace(tmp, self.last_path)
+            except OSError as e:
+                log.warning("could not save last lighting state: %s", e)
+
+    def _reapply_saved(self) -> None:
+        """Give each device back its last confirmed lighting once it is online and writable."""
+        with self._saved_lock:
+            saved = dict(self._saved)
+        for dev, st in saved.items():
+            rec = self.orch.registry.get(dev)
+            # skip devices already showing it, and never override a newer request the user made
+            if (rec and rec.connection == Connection.CONNECTED and rec.caps.writable and not rec.shadowed_by
+                    and rec.confirmed is None and rec.desired in (None, st)):
+                self.orch.apply(dev, st, wait=False)
 
     def start_background(self) -> None:
         def loop():
