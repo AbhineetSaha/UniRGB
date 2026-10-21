@@ -3,7 +3,7 @@
 One open-source app for your PC's lighting and peripherals. It controls the devices it has a verified
 protocol for, directly and without vendor software, and tells you plainly which devices it can't control and why.
 
-License: **GPL-3.0-or-later** · Windows 10/11 · Python 3.11+ · standard library only, no admin rights needed.
+License: **GPL-3.0-or-later** · Windows 10/11 · Python 3.11+ · standard library only. No admin rights needed, except one optional prompt if you turn on CPU temperature.
 
 ## Supported devices
 
@@ -31,8 +31,8 @@ cleared, and other devices keep their last color. Use **Return to vendor app** o
 
 ## Optional companions (open source, installed separately)
 
-- **LibreHardwareMonitor**: CPU temperature for the pump display, plus fan speeds. Run it as administrator
-  and enable *Options → Remote Web Server* (port 8085).
+- **LibreHardwareMonitor**: fan speeds, and a CPU temperature fallback if you don't turn on UniRGB's own
+  (Settings → CPU temperature). Run it as administrator and enable *Options → Remote Web Server* (port 8085).
 - **OpenRGB**: RAM lighting. Run it as administrator, untick devices UniRGB already drives (Settings → Supported
   Devices), and start the SDK server (port 6742).
 
