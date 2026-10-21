@@ -53,7 +53,7 @@ export default function Download() {
           <p className="eyebrow">Or run from source</p>
           <p className="lead mt-3 text-base">Requires Python 3.11+. Standard library only, no dependencies.</p>
           <pre className="mt-3 overflow-x-auto rounded-[10px] border border-line bg-bg p-4 font-mono text-sm leading-[1.7]"><code>{`git clone ${REPO}\ncd UniRGB\npython -m unirgb`}</code></pre>
-          <p className="note">The UI opens at <span className="font-mono">http://127.0.0.1:47821/</span>. Optional companions (LibreHardwareMonitor, OpenRGB) are covered in the <ExternalLink href={`${REPO}#optional-companions-open-source-installed-separately`}>README</ExternalLink>.</p>
+          <p className="note">The UI opens at <span className="font-mono">http://127.0.0.1:47821/</span>. The one-time driver setup for CPU temperature works only in the installed app. If something doesn't work, see <ExternalLink href={`${REPO}#troubleshooting`}>troubleshooting</ExternalLink>.</p>
         </div>
       </div>
     </Section>

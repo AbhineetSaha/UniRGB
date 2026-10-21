@@ -111,12 +111,18 @@ def enable(user_sid: str, src_exe: Path, run=_run, driver=driver_state, dst: Pat
     return steps
 
 
-def disable(run=_run, dst: Path | None = None) -> list[str]:
+def disable(run=_run, dst: Path | None = None, wait_tries: int = 20) -> list[str]:
     dst = dst or helper_dir()
+    run(["schtasks", "/end", "/tn", TASK_NAME])      # a running helper keeps its .exe locked
     run(["schtasks", "/delete", "/tn", TASK_NAME, "/f"])   # fine if it was never created
-    # Delete only what enable() created, never the folder blindly.
-    for f in [dst / "UniRGB.exe", dst / "setup-result.json", *(dst / "modules").glob("*.bin")]:
-        f.unlink(missing_ok=True)
+    # Delete only what enable() and the helper created, never the folder blindly.
+    for f in [dst / "UniRGB.exe", dst / "setup-result.json", dst / "helper.log", *(dst / "modules").glob("*.bin")]:
+        for _ in range(wait_tries):   # the ended helper may take a moment to release its files
+            try:
+                f.unlink(missing_ok=True)
+                break
+            except PermissionError:
+                time.sleep(0.25)
     for d in (dst / "modules", dst):
         try:
             d.rmdir()

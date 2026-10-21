@@ -70,9 +70,16 @@ class SetupTests(unittest.TestCase):
         (self.dst / "someone-elses.txt").write_text("keep")
         run = FakeRun()
         ss.disable(run=run, dst=self.dst)
-        self.assertEqual(run.calls[0][:2], ["schtasks", "/delete"])
+        self.assertEqual([c[:2] for c in run.calls], [["schtasks", "/end"], ["schtasks", "/delete"]],
+                         "the running helper is ended before its files are deleted")
         self.assertFalse((self.dst / "UniRGB.exe").exists())
         self.assertTrue((self.dst / "someone-elses.txt").exists())
+
+    def test_disable_leaves_no_folder_behind(self):
+        ss.enable(SID, self.exe, run=FakeRun(), driver=lambda: "running", dst=self.dst)
+        (self.dst / "helper.log").write_text("log")
+        ss.disable(run=FakeRun(), dst=self.dst)
+        self.assertFalse(self.dst.exists())
 
     def test_status_flags_an_app_update_as_stale(self):
         ss.enable(SID, self.exe, run=FakeRun(), driver=lambda: "running", dst=self.dst)
