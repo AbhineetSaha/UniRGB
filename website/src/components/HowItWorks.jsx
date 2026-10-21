@@ -2,7 +2,7 @@ import Section from './Section.jsx';
 
 // Step colors walk the logo gradient: red, amber, green, blue.
 const STEPS = [
-  ['Install', 'Run the per-user installer. It needs no admin prompt and adds a Start Menu entry and an uninstaller.', 'border-led-r'],
+  ['Install', 'Run the per-user installer, with no admin prompt. On first start, pick the features you want. Only CPU temperature on the pump display asks for admin rights, once.', 'border-led-r'],
   ['Detect', 'UniRGB scans your devices and splits them into controllable and monitor-only, with a reason for each.', 'border-[#c9a227]'],
   ['Customize', 'Set color, brightness, zones, and mouse settings such as DPI and polling rate.', 'border-led-g'],
   ['Sync & save', 'Sync every device to one color, save it as a scene, and quit to hand lighting back.', 'border-led-b'],

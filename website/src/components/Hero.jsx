@@ -11,7 +11,7 @@ export default function Hero() {
           <a className="btn btn-primary" href="#download">Download UniRGB</a>
           <a className="btn" href="#features">Explore features</a>
         </div>
-        <small className="mt-4 block text-sm text-muted">No admin rights needed. No telemetry, no accounts.</small>
+        <small className="mt-4 block text-sm text-muted">No admin rights needed for lighting. No telemetry, no accounts.</small>
         <figure className="relative isolate mt-16">
           <div className="bg-rgb absolute inset-x-[8%] top-[10%] -bottom-[10%] -z-10 opacity-20 blur-[90px]" />
           <img className="rounded-t-[14px] border border-b-0 border-line" src="app.png" width="2560" height="1600" alt="The UniRGB app: a device list split into controllable and monitor-only devices, with lighting controls and requested versus confirmed state for the selected device." />

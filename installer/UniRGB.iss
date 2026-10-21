@@ -1,6 +1,6 @@
 ; Inno Setup script: builds dist\UniRGB-Setup-<version>.exe from dist\UniRGB.exe.
 ; Per-user install, no admin prompt. User settings in %APPDATA%\UniRGB are kept on uninstall.
-#define AppVersion "0.1.0"
+#define AppVersion "0.2.0"
 
 [Setup]
 AppId={{6011F4D6-4109-4C7D-A61B-BF517C51E308}
@@ -43,7 +43,16 @@ Filename: "{app}\UniRGB.exe"; Description: "Start UniRGB"; Flags: nowait postins
 [UninstallRun]
 ; stop a running UniRGB so its files can be removed
 Filename: "{sys}\taskkill.exe"; Parameters: "/IM UniRGB.exe /F"; Flags: runhidden; RunOnceId: "StopUniRGB"
+; if the one-time setup ran, remove its scheduled task and the helper in Program Files (one UAC prompt).
+; PawnIO stays installed: other programs may use it, and it has its own entry in Apps.
+Filename: "{app}\UniRGB.exe"; Parameters: "--system-setup disable"; Verb: "runas"; Flags: shellexec waituntilterminated runhidden; RunOnceId: "RemoveHelper"; Check: HelperInstalled
 
 [Registry]
 ; per-user autostart, no admin; the Start Menu shortcut opens the window of the running instance
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "UniRGB"; ValueData: """{app}\UniRGB.exe"" --no-window"; Flags: uninsdeletevalue; Tasks: autostart
+
+[Code]
+function HelperInstalled: Boolean;
+begin
+  Result := FileExists(ExpandConstant('{commonpf64}\UniRGB Hardware Helper\UniRGB.exe'));
+end;

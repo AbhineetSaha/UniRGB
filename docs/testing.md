@@ -59,4 +59,5 @@ The device's row in [device-capability-matrix.md](device-capability-matrix.md) i
   pump display reading the CPU temperature from the helper.
 - Quit from the tray: no `UniRGB.exe` process left in Task Manager.
 - Sign out and in with autostart on: the tray icon appears and saved lighting is re-applied.
-- **Remove it** in Settings: the scheduled task and the Program Files folder are gone.
+- **Remove it** in Settings, and separately an uninstall: the scheduled task and the Program Files folder are gone,
+  even while the helper was running.

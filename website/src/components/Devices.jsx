@@ -7,7 +7,7 @@ const DEVICES = [
   ['MSI Mystic Light 761 boards', '0DB0:0076', 'ARGB / EZ Conn headers per zone, setup read-back, baseline restore', 'Direct HID. Blocked while MSI Center lighting runs. Tested on X870E GAMING PLUS WIFI'],
   ['Kreo Hive RGB and other Evision V2 keyboards', '320F:5055', 'Whole-keyboard color, off', 'Direct HID, live colors only. The keyboard reverts by itself when UniRGB stops'],
   ['Ant Esports AIO pump display', '5131:2007', 'CPU or GPU temperature, °C/°F', 'HID output reports, only after you confirm the device'],
-  ['RAM', null, 'Color', "Optional, through OpenRGB's SDK server"],
+  ['RAM', null, 'Color', "Through OpenRGB's SDK server if you run it. UniRGB's own RAM support is in progress"],
   ['Razer Chroma devices', null, 'Color', "Optional fallback through Razer's Chroma SDK if Synapse is installed"],
   ['Everything else', null, "Listed, with the reason it isn't controllable", 'Read-only inventory'],
 ];
@@ -34,7 +34,7 @@ export default function Devices() {
           </tbody>
         </table>
       </div>
-      <p className="note">Missing your device? <ExternalLink href={`${REPO}/issues`}>Request support on GitHub</ExternalLink>. Planned next: an animated effects engine and device-change notifications (<ExternalLink href={`${REPO}/blob/main/docs/roadmap.md`}>roadmap</ExternalLink>). Linux and macOS have no device support yet.</p>
+      <p className="note">Missing your device? <ExternalLink href={`${REPO}/issues`}>Request support on GitHub</ExternalLink>. Planned next: RAM lighting without OpenRGB, and Windows Dynamic Lighting devices from any vendor (<ExternalLink href={`${REPO}/blob/main/docs/roadmap.md`}>roadmap</ExternalLink>). Linux and macOS have no device support yet.</p>
     </Section>
   );
 }

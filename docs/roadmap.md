@@ -11,7 +11,8 @@
 - Tray icon, background start at sign-in, single instance, clean quit that hands devices back
 - Vendor fallbacks: Razer Chroma SDK, OpenRGB (RAM)
 - Scenes (save, apply, import, export) and "Sync all"
-- Windows installer with a hash-pinned PawnIO bundle; CI, CodeQL and protected `main`
+- Windows installer with a hash-pinned PawnIO bundle; the uninstaller removes the helper and its task
+- CI, CodeQL and protected `main`
 
 ## Next
 
@@ -19,12 +20,10 @@
    hardware helper, with SPD hubs and power controllers permanently excluded.
 2. **Windows Dynamic Lighting (LampArray).** A standard adapter that controls any device exposing the HID LampArray
    usage, from any vendor.
-3. **Uninstall cleanup.** The uninstaller should also remove the hardware helper and its scheduled task. Until then,
-   turn off CPU temperature in Settings (which removes them) before uninstalling.
-4. **Animated effects engine.** App-driven frames (breathing, spectrum, wave) with a frame-rate cap and a CPU budget test.
-5. **Device-change notifications** instead of polling every 15 s.
-6. **More devices** through device-support requests: each needs a read-only probe log and a real-hardware test.
-7. **Code signing and winget** so Windows stops warning on download.
+3. **Animated effects engine.** App-driven frames (breathing, spectrum, wave) with a frame-rate cap and a CPU budget test.
+4. **Device-change notifications** instead of polling every 15 s.
+5. **More devices** through device-support requests: each needs a read-only probe log and a real-hardware test.
+6. **Code signing and winget** so Windows stops warning on download.
 
 ## Known limitations
 

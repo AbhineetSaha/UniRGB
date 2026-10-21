@@ -58,11 +58,12 @@ The app never runs elevated. Without the optional feature, nothing elevated is i
 
 ## Removing UniRGB completely
 
-1. In **Settings**, turn off CPU temperature and click **Remove it**. This deletes the scheduled task and the helper
-   folder in Program Files (one admin prompt).
-2. Uninstall UniRGB from Windows Settings → Apps.
-3. Optional: uninstall PawnIO from Windows Settings → Apps, if no other program uses it.
-4. Optional: delete your settings and scenes:
+1. Uninstall UniRGB from Windows Settings → Apps. If the one-time setup ran, the uninstaller asks for administrator
+   rights once and removes the scheduled task and the helper folder in Program Files. (**Remove it** in Settings does
+   the same without uninstalling.)
+2. Optional: uninstall PawnIO from Windows Settings → Apps, if no other program uses it. UniRGB leaves it installed
+   because other hardware tools may rely on it.
+3. Optional: delete your settings and scenes:
 
 ```cmd
 rmdir /s /q "%APPDATA%\UniRGB" "%LOCALAPPDATA%\UniRGB"
