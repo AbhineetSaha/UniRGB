@@ -25,7 +25,8 @@ ENE_DRAM_ADDRESSES = range(0x70, 0x78)
 # Shared with LibreHardwareMonitor, HWiNFO, OpenRGB and firmware: hold it for every transfer.
 SMBUS_MUTEX = "Global\\Access_SMBUS.HTP.Method"
 PAWNIO_DLL = Path(r"C:\Program Files\PawnIO\PawnIOLib.dll")
-PIIX4_MODULE = Path(r"C:\Program Files\OpenRGB\SmbusPIIX4.bin")
+# staged from the hash-pinned PawnIO.Modules release by: python tools\fetch_pawnio.py SmbusPIIX4.bin
+PIIX4_MODULE = Path(__file__).resolve().parents[1] / "build" / "pawnio" / "modules" / "SmbusPIIX4.bin"
 AMD_VENDOR = 0x1022
 _U64 = (1 << 64) - 1
 

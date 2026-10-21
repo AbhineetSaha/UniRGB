@@ -35,7 +35,8 @@ def main(argv: list[str] | None = None) -> int:
         print("Run this from an administrator terminal on Windows (PawnIO needs it).")
         return 2
     if not args.module.is_file():
-        print(f"PawnIO module not found: {args.module}. Pass --module.")
+        print(f"PawnIO module not found: {args.module}.")
+        print(r"Run 'python tools\fetch_pawnio.py SmbusPIIX4.bin' first, or pass --module.")
         return 2
 
     pawn = PawnIO()
