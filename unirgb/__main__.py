@@ -45,11 +45,26 @@ def _open_window(url: str) -> None:
     webbrowser.open(url)
 
 
+def _relaunch(argv: list[str]) -> None:
+    """Start a fresh UniRGB without a new window: the open page reconnects to it by itself."""
+    args = [a for a in argv if a != "--no-window"] + ["--no-window"]
+    cmd = [sys.executable, *args] if getattr(sys, "frozen", False) else [sys.executable, "-m", "unirgb", *args]
+    # a fresh one-file bootstrap, not a child that reuses this instance's unpacked files (deleted when we exit)
+    env = {**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"}
+    subprocess.Popen(cmd, env=env, close_fds=True, creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+
+
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["--cpu-helper"]:   # how the packaged .exe starts its elevated sensor helper
         from .cpu_temp_helper import main as helper_main
         return helper_main(argv[1:])
+    if argv[:1] == ["--hardware-helper"]:   # started elevated by the scheduled task; fixed arguments
+        from .hardware_helper import main as hw_main
+        return hw_main(argv[1:])
+    if argv[:1] == ["--system-setup"]:   # elevated one-time setup started from Settings
+        from .system_setup import main as setup_main
+        return setup_main(argv[1:])
     ap = argparse.ArgumentParser(prog="unirgb", description="UniRGB unified device & RGB control center")
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument("--simulate", action="store_true", help="add clearly labelled simulated devices")
@@ -87,6 +102,12 @@ def main(argv=None) -> int:
         signal.signal(signal.SIGBREAK, lambda *_: stop.set())
     threading.Thread(target=srv.serve_forever, name="http", daemon=True).start()
     log.info("UI at %s", url)
+    tray = None
+    if sys.platform == "win32":
+        from .hostos.tray import Tray
+        tray = Tray(Path(__file__).parent / "ui" / "logo.ico", f"UniRGB {VERSION} is running",
+                    on_open=lambda: _open_window(url), on_quit=app.request_quit)
+        tray.start()
     if not args.no_window:
         _open_window(url)
     try:
@@ -95,8 +116,13 @@ def main(argv=None) -> int:
                 break
     finally:
         log.info("shutting down: releasing device sessions")
+        if tray:
+            tray.stop()
         srv.shutdown()
         app.shutdown()
+        srv.server_close()   # free the port before the new instance binds it
+        if app.restart_requested:
+            _relaunch(argv)
     return 0
 
 

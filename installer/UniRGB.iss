@@ -28,6 +28,9 @@ Name: "autostart"; Description: "Start UniRGB in the background when I sign in"
 Source: "..\dist\UniRGB.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"
 Source: "..\README.md"; DestDir: "{app}"
+; PawnIO installer, module and licences, staged by tools\fetch_pawnio.py (hash-checked). Used only by the
+; one-time setup in Settings, if the user turns on a feature that needs the driver.
+Source: "..\build\pawnio\*"; DestDir: "{app}\pawnio"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{group}\UniRGB"; Filename: "{app}\UniRGB.exe"

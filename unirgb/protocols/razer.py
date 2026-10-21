@@ -23,6 +23,14 @@ class RazerProtocolError(Exception):
     pass
 
 
+class RazerBusy(RazerProtocolError):
+    """Every reply belonged to another program's commands: something else is streaming to the device."""
+
+
+class RazerAsleep(RazerProtocolError):
+    """The receiver answered "timeout": the wireless mouse is asleep, off or out of range."""
+
+
 def crc(report: bytes) -> int:
     c = 0
     for b in report[2:88]:
@@ -127,9 +135,11 @@ class RazerTransport:
 
     def __init__(self, dev, wait_s: float = 0.06, retries: int = 5):
         self.dev, self.wait_s, self.retries = dev, wait_s, retries
+        self.foreign = 0   # replies to other programs' commands seen in the last transact
 
     def transact(self, request: bytes) -> dict:
         last = None
+        self.foreign = 0
         for _ in range(self.retries):
             self.dev.set_feature(b"\x00" + request)
             time.sleep(self.wait_s)
@@ -137,6 +147,7 @@ class RazerTransport:
             resp = parse(raw)
             last = resp
             if resp["class"] != request[6] or resp["id"] != request[7]:
+                self.foreign += 1
                 time.sleep(0.01)    # answer to someone else's command (e.g. Synapse); retry
                 continue
             if resp["status"] == 0x02:
@@ -144,6 +155,10 @@ class RazerTransport:
             if resp["status"] == 0x01:
                 time.sleep(0.01)
                 continue
+            if resp["status"] == 0x04:
+                raise RazerAsleep("device answered timeout")
             raise RazerProtocolError(f"device answered {STATUS.get(resp['status'], resp['status'])}")
+        if self.foreign:
+            raise RazerBusy(f"another program kept the device busy (its command {last['class']:02X}/{last['id']:02X})")
         raise RazerProtocolError(f"no matching response after {self.retries} tries (last status "
                                  f"{STATUS.get(last['status'], last['status']) if last else 'none'})")

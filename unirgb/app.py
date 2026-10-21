@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 import threading
 import time
 from pathlib import Path
@@ -20,7 +21,9 @@ from .adapters.simulated import SimulatedAdapter
 from .core.models import Connection, LightingState
 from .core.orchestrator import Orchestrator
 from .core.scenes import SceneStore
+from . import sensors, system_setup
 from .hostos import windows_hid, windows_system
+from .prefs import PrefsStore
 
 log = logging.getLogger("unirgb")
 VERSION = "0.1.0"
@@ -53,6 +56,7 @@ class App:
     def __init__(self, simulate: bool = False, direct: bool = True, scenes_path: Path | None = None, openrgb_port: int = 6742,
                  adapters=None, hid_cache: HidCache | None = None, rescan_interval: float = 15.0):
         self.simulate = simulate
+        self._helper_started = float("-inf")
         self.hid = hid_cache or HidCache()
         if adapters is None:
             adapters = [RazerChromaAdapter(self.hid.get), OpenRGBAdapter(port=openrgb_port),
@@ -60,22 +64,35 @@ class App:
             if direct:
                 procs = windows_system.running_processes
                 board = lambda: ((windows_system.hardware_summary().get("board") or {}).get("Product") or "")
-                adapters = [CoolerDisplayAdapter(self.hid.get), KreoDirectAdapter(self.hid.get), RazerDirectAdapter(self.hid.get, process_provider=procs),
+                cpu = lambda: (sensors.read_hw_helper(self._start_helper) or sensors.read_lhm_cpu()
+                               or sensors.read_helper_file())
+                adapters = [CoolerDisplayAdapter(self.hid.get, cpu_reader=cpu), KreoDirectAdapter(self.hid.get), RazerDirectAdapter(self.hid.get, process_provider=procs),
                             MsiDirectAdapter(self.hid.get, process_provider=procs, board_provider=board)] + adapters
             if simulate:
                 adapters.append(SimulatedAdapter())
         self.orch = Orchestrator(adapters)
         self.scenes = SceneStore(scenes_path)
         self.last_path = self.scenes.path.parent / "last_state.json"
+        self.prefs = PrefsStore(self.scenes.path.parent / "prefs.json")
         self._saved_lock = threading.Lock()
         self._saved = self._load_saved()
         self.orch.on_change = self._remember
         self.rescan_interval = rescan_interval
         self._stop = threading.Event()
         self.quit_requested = threading.Event()
+        self.restart_requested = False   # __main__ starts a fresh UniRGB after shutting this one down
         self._scan_lock = threading.Lock()
         self.last_scan: float = 0.0
         self.last_scan_ms: float = 0.0
+
+    def _start_helper(self) -> None:
+        """Start the privileged helper through its task: only if the user enabled it, at most every 30 s."""
+        now = time.monotonic()
+        # without the driver the helper only fails; not counting that as a start lets it launch right after setup
+        if (self.prefs.prefs.cpu_temperature and now - self._helper_started > 30
+                and system_setup.driver_state() != "not-installed"):
+            self._helper_started = now
+            system_setup.start_helper()
 
     def rescan(self, full: bool = False) -> None:
         with self._scan_lock:
@@ -129,9 +146,13 @@ class App:
                     log.exception("background rescan failed")
         threading.Thread(target=loop, name="rescan", daemon=True).start()
 
-    def request_quit(self) -> None:
+    def request_quit(self, restart: bool = False) -> None:
+        self.restart_requested = self.restart_requested or restart
         self.quit_requested.set()
 
     def shutdown(self) -> None:
         self._stop.set()
         self.orch.shutdown()
+        if sys.platform == "win32" and self.prefs.prefs.cpu_temperature:   # the elevated helper quits with us
+            from .hostos import pipe
+            pipe.request({"op": "stop"}, timeout_s=1.0)

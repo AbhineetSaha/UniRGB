@@ -1,6 +1,6 @@
 """In-process fakes of external control paths. They model the documented wire
 formats only. Passing tests against them proves our encoding is self-consistent,
-not that real servers accept it. Real-hardware results are recorded in docs/testing.md."""
+not that real servers accept it. How to report real-hardware results: docs/testing.md."""
 from __future__ import annotations
 
 import json

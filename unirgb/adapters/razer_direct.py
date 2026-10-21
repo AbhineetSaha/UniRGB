@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from pathlib import Path
 from typing import Callable
 
@@ -55,6 +56,15 @@ class RazerDirectAdapter(DeviceAdapter):
             t = self._transport[dev_id] = rz.RazerTransport(d)
         return t
 
+    def quit_synapse(self) -> ApplyResult:
+        """Only on the user's click: Synapse streams its lighting to the mouse and nothing else gets through."""
+        r = subprocess.run(["taskkill", "/F", "/IM", "RazerAppEngine.exe"], capture_output=True, text=True,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        if r.returncode != 0:
+            return ApplyResult(False, message=f"could not quit Razer Synapse: {(r.stderr or r.stdout).strip()}")
+        return ApplyResult(True, message="Razer Synapse closed. It starts again with Windows unless you turn off "
+                                         "its startup entry (Task Manager, Startup apps).")
+
     def _drop(self, dev_id: str) -> None:
         d = self._devs.pop(dev_id, None)
         self._transport.pop(dev_id, None)
@@ -80,15 +90,28 @@ class RazerDirectAdapter(DeviceAdapter):
                 self._drop(dev_id)
             self._info[dev_id] = h
             evidence = [f"HID {vidpid} interface 0, feature report {h.feature_len} bytes"]
-            conn, notes = Connection.CONNECTED, []
+            conn, notes, busy = Connection.CONNECTED, [], False
             try:
-                fw = self._transport_for(dev_id).transact(rz.get_firmware())
+                t = self._transport_for(dev_id)
+                fw = t.transact(rz.get_firmware())
+                if t.foreign and synapse:   # got through between Synapse's frames: it would paint over UniRGB anyway
+                    raise rz.RazerBusy("Razer Synapse is streaming lighting to the mouse")
                 evidence.append(f"firmware v{fw['args'][0]}.{fw['args'][1]} read over HID (device answered)")
+            except rz.RazerAsleep:
+                conn = Connection.ASLEEP
+                notes.append("The mouse is asleep (it turns itself off after its sleep timer). Move it: UniRGB "
+                             "reconnects and puts your lighting back within about 15 seconds.")
+            except rz.RazerBusy:
+                conn, busy = Connection.UNAVAILABLE, True
+                notes.append("Another program is driving this mouse's lighting: it sends a new lighting frame many "
+                             "times a second, so UniRGB's commands cannot get through. " +
+                             ("That is Razer Synapse. Quit it (button above, or its tray icon, then Exit) and UniRGB "
+                              "takes over within about 15 seconds." if synapse else "Close other RGB apps and press Rescan."))
             except Exception as e:
                 conn = Connection.UNAVAILABLE
-                notes.append(f"The receiver answered, but the mouse did not ({e}). It is probably asleep or "
-                             "switched off. Move it and press Rescan.")
-            if synapse:
+                notes.append(f"The receiver is there, but the mouse did not answer properly ({e}). If Razer Synapse "
+                             "is running it may be talking to the mouse at the same time. Press Rescan.")
+            if synapse and not busy:
                 notes.append("Razer Synapse is running and talks to the same interface. It can re-apply its own "
                              "lighting over UniRGB's. For exclusive control, quit Synapse.")
             notes += ["Lighting is written NOSTORE: the profile saved on the mouse is never changed. A sleep/wake, "
@@ -97,7 +120,7 @@ class RazerDirectAdapter(DeviceAdapter):
             out.append(DiscoveredDevice(
                 DeviceInfo(dev_id, SUPPORTED[h.pid], Category.MOUSE, self.name, vendor="Razer", model=SUPPORTED[h.pid],
                            vidpid=vidpid, physical_key=f"usb:{vidpid}", connection_path=self.control_path,
-                           controlled_by=["UniRGB (direct)"] + (["Razer Synapse (also running)"] if synapse else []),
+                           controlled_by=["UniRGB (direct)"] + ([f"Razer Synapse ({'controlling the lighting' if busy else 'also running'})"] if synapse else []),
                            evidence=evidence),
                 Capabilities(read_state=Support.SUPPORTED, color=Support.SUPPORTED,
                              brightness=Support.SUPPORTED, brightness_native=True, effects=["static", "off"],

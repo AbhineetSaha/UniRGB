@@ -19,6 +19,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from .core.models import LightingState
+from . import system_setup
 
 log = logging.getLogger("unirgb.server")
 UI_FILE = Path(__file__).parent / "ui" / "index.html"
@@ -106,7 +107,11 @@ def make_server(app, host: str = "127.0.0.1", port: int = 0) -> ThreadingHTTPSer
             "scenes": {n: {d: s.to_dict() for d, s in devs.items()} for n, devs in app.scenes.list().items()},
             "scene_store": {"path": str(app.scenes.path), "load_error": app.scenes.load_error},
             "last_scan": app.last_scan, "last_scan_ms": round(app.last_scan_ms, 1),
+            "prefs": prefs_payload(),
         }
+
+    def prefs_payload():
+        return {**app.prefs.to_dict(), "driver": system_setup.driver_state()}
 
     def route(method, parts, h):
         if method == "GET" and parts == ["favicon.ico"]:
@@ -123,6 +128,21 @@ def make_server(app, host: str = "127.0.0.1", port: int = 0) -> ThreadingHTTPSer
             # release device sessions, then let the main loop exit
             threading.Thread(target=app.request_quit, daemon=True).start()
             return 200, {"ok": True, "message": "UniRGB is shutting down; vendor apps take lighting back"}
+        if method == "POST" and p == ["restart"]:
+            threading.Thread(target=app.request_quit, args=(True,), daemon=True).start()
+            return 200, {"ok": True, "message": "UniRGB is restarting"}
+        if method == "POST" and p == ["prefs"]:
+            app.prefs.update(h._body())   # ValueError -> 400 with the reason
+            return 200, prefs_payload()
+        if p == ["system-setup"]:
+            if method == "GET":
+                return 200, system_setup.status(Path(sys.executable))
+            if method == "POST":
+                body = h._body()
+                if not isinstance(body, dict) or not isinstance(body.get("enable"), bool):
+                    raise ApiError(400, 'expected {"enable": true|false}')
+                ok, message = system_setup.request(body["enable"])
+                return (200 if ok else 409), {"ok": ok, "message": message}
         if method == "POST" and p == ["rescan"]:
             app.rescan(full=True)
             return 200, state_payload()
@@ -155,6 +175,16 @@ def make_server(app, host: str = "127.0.0.1", port: int = 0) -> ThreadingHTTPSer
                 if not hasattr(adapter, "start_cpu_helper"):
                     raise ApiError(404, "device has no CPU helper")
                 res = adapter.start_cpu_helper()
+                return (200 if res.ok else 409), {"ok": res.ok, "message": res.message}
+            if method == "POST" and action == "quit-synapse":
+                rec = app.orch.registry.get(dev)
+                adapter = app.orch.adapters.get(rec.info.adapter) if rec else None
+                if not hasattr(adapter, "quit_synapse"):
+                    raise ApiError(404, "device has no vendor app to quit")
+                res = adapter.quit_synapse()
+                if res.ok:
+                    time.sleep(1.0)   # let Synapse's last frame finish before UniRGB asks the mouse again
+                    app.rescan()
                 return (200 if res.ok else 409), {"ok": res.ok, "message": res.message}
         if p == ["scenes"] and method == "POST":
             body = h._body()

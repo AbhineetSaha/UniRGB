@@ -1,79 +1,72 @@
 # Security and safety
 
-## v0.2 boundary change (at the user's request)
+## What runs with which rights
 
-Direct HID writes are now made to two devices whose protocols are documented by open-source drivers:
-the Razer Basilisk V3 Pro (openrazer) and the MSI Mystic Light 761 controller (OpenRGB, board MS-7E70 listed as tested).
-Guards: Razer writes are NOSTORE only. MSI writes need MSI Center's lighting stopped, a board string containing `MS-7E70`,
-and a saved baseline, and they send only OpenRGB's tested setup layout. SMBus, I²C, EC and firmware remain off-limits.
-The table below describes v0.1 and still applies to every other device. Details: [direct-control.md](direct-control.md).
+| Part | Rights | Starts when |
+|---|---|---|
+| UniRGB app (UI server, adapters, tray) | Your normal user account | You start it, or at sign-in if you chose autostart |
+| One-time setup (`UniRGB.exe --system-setup`) | Administrator, after a UAC prompt | You click **Set up now** or **Remove it** in Settings |
+| Hardware helper (`%ProgramFiles%\UniRGB Hardware Helper\UniRGB.exe --hardware-helper`) | Administrator, through a scheduled task you approved once | UniRGB needs the CPU temperature and CPU temperature is turned on |
 
-### Elevated CPU-temperature helper (v0.3)
+The app never runs elevated. Without the optional feature, nothing elevated is installed.
 
-The only code that runs with administrator rights is `unirgb/cpu_temp_helper.py`. It starts only after a UAC prompt and calls
-only AMD's signed CLI with read-only arguments (`-a GetPMTableData`, `--api GetCurrentTemperature`); the CLI's
-overclocking "Set" calls are never used. It writes one JSON file and exits when the UniRGB process ends.
-Caveat: the helper runs from the project folder, which your user account can modify, so anything that can write
-there could run elevated at the next prompt. Keep the project in a folder only you control.
+## The hardware helper
 
-### RAM: written only through OpenRGB (user decision, 2026-10-19)
+* **Fixed requests:** `ping`, `cpu_temp` (AMD Zen temperature register, read-only) and `stop`. Anything else is refused.
+  One newline-terminated JSON request per connection, at most 4 KB.
+* **Pipe access:** `\\.\pipe\UniRGB-hardware-helper` admits only the signed-in user (read/write) and SYSTEM, at a
+  security level that blocks low-integrity processes such as sandboxed browsers. It rejects remote clients, and the
+  helper refuses to start if another program already owns the pipe name.
+* **Admin-only files:** the helper and its PawnIO module are copied into Program Files, where standard users can't
+  change them, and the helper loads modules only from its own folder. The scheduled task has no trigger, fixed
+  arguments, and runs only when started.
+* **Lifetime:** the helper exits when UniRGB quits (it is sent `stop`) or after 60 s without requests.
+* **Shared hardware locks:** register reads take the system-wide `Global\Access_PCI` mutex that other hardware tools
+  (LibreHardwareMonitor, HWiNFO, OpenRGB) use, so they never access the same registers at the same time.
+* **PawnIO:** the driver is installed from its official signed installer, bundled unmodified and checked against a
+  pinned SHA-256 at build time.
 
-You first asked for risk-free RAM handling, then chose to change RAM colors through OpenRGB, accepting that an SMBus
-write can damage a module. How that is contained:
-- UniRGB itself still has **no SMBus code** (`tests/test_safety.py` enforces this). It only sends colors to OpenRGB's
-  SDK server over TCP. OpenRGB, whose G.Skill/ENE DRAM support is maintained and tested, performs the SMBus access through PawnIO.
-- UniRGB's OpenRGB link exposes **only RAM** (OpenRGB device type 1), so OpenRGB never becomes a second writer
-  for the board, mouse or keyboard.
-- MSI Center's lighting must stay off, or it and OpenRGB would both write the DIMMs.
+## What UniRGB does and never does
 
-## Operating boundary (enforced in code)
-
-| UniRGB does | UniRGB never does |
+| Does | Never does |
 |---|---|
-| Opens HID devices with **desired access 0** (query-only) to read descriptors and strings | Read or write HID input, output or feature reports itself |
-| Calls Razer's documented Chroma REST API on `localhost:54235` | Touch SMBus, I²C, EC, PCI config space, Super I/O or firmware |
-| Talks to OpenRGB's SDK server **only if the user is already running it** | Start, stop or reconfigure vendor services, drivers or apps |
-| Queries service state with `SERVICE_QUERY_STATUS` only | Install drivers (e.g. PawnIO), change permissions, need admin |
-| Reads MSI's own log file and CIM inventory | Modify vendor configuration or profiles |
-| Writes only its own files under `%APPDATA%\UniRGB` and `%LOCALAPPDATA%\UniRGB` | Store credentials. None are used |
-
-Runs as a normal user. No elevation is requested or needed.
+| Opens HID devices to read descriptors and strings, and sends reports only to supported devices with an exact VID:PID match | Write SMBus, I²C, embedded-controller, Super I/O or firmware |
+| Writes volatile lighting where the device allows it (Razer NOSTORE, Kreo live colors) | Change the profiles stored on your devices |
+| Talks to OpenRGB's SDK server and the Razer Chroma SDK only if you are already running them | Install anything except PawnIO and the helper, and only with your approval |
+| Quits Razer Synapse only when you click **Quit Razer Synapse** | Change vendor apps' settings or uninstall them |
+| Writes its own files under `%APPDATA%\UniRGB` and `%LOCALAPPDATA%\UniRGB` | Store credentials (none are used) or send data off your PC |
 
 ## Local attack surface
 
 | Surface | Risk | Mitigation |
 |---|---|---|
-| HTTP API on 127.0.0.1:47821 | Another local process or a web page drives your lighting | Loopback bind. Host allow-list blocks DNS rebinding. Per-run random token required on POST/DELETE (web pages cannot read it cross-origin). Body cap 256 KB. CSP + `nosniff`. No CORS headers |
-| Scene import | Malformed JSON | Strict schema: version check, name regex, color and brightness validation. A file that fails to parse is never overwritten (saves go to `scenes.recovered.json`) |
-| Razer Chroma server (not ours) | It sends `Access-Control-Allow-Origin: *`, so any website can change Chroma lighting | Outside UniRGB's control. Documented here. Lighting changes are its only effect |
-| `EneIo64.sys` (shipped with MSI Center) | Drivers of this family have historically exposed raw port/memory I/O to user mode | UniRGB never loads or calls it. Worth knowing as part of the system's existing attack surface |
-| Logs | Information disclosure | Logs hold device IDs and session URIs only. No secrets exist to leak |
+| HTTP API on `127.0.0.1:47821` | Another local process or a web page drives your lighting | Loopback bind. Host allow-list blocks DNS rebinding. A per-run random token is required on every mutating request (web pages can't read it cross-origin). 256 KB body cap. CSP and `nosniff`. No CORS headers |
+| Hardware helper pipe | Another program asks the elevated helper to do something | Fixed request list, user-only ACL, no remote clients, read-only requests (see above) |
+| Scene import | Malformed JSON | Strict schema: version check, name pattern, color and brightness validation. An unreadable scenes file is never overwritten |
+| Razer Chroma server (not UniRGB's) | It accepts requests from any web page | Outside UniRGB's control; lighting changes are its only effect |
+| Logs | Information disclosure | Logs hold device IDs and states only. No secrets exist to leak |
 
-## Hardware-safety risks
+## Hardware-safety measures
 
 | Risk | Mitigation |
 |---|---|
-| Two programs writing the same controller (flicker, corrupted state) | UniRGB uses only vendor-sanctioned paths. The ownership resolver refuses writes to hardware owned by a higher-priority path. OpenRGB devices carry an explicit conflict warning |
-| Leaving devices in UniRGB's colors after exit or crash | Quit → session DELETE. Crash → journal cleanup on next start. Synapse also expires abandoned sessions (observed ≤120 s) |
-| Runaway writes (slider drags) | Client throttling plus server-side coalescing. A circuit breaker pauses an adapter after 3 consecutive failures |
+| Two programs writing the same controller (flicker, corrupted state) | UniRGB's own paths never overlap (ownership by `physical_key`). MSI writes are refused while MSI Center's lighting runs. Synapse streaming to the mouse is detected and reported |
+| Writing to the wrong motherboard | MSI writes need a board ID from the tested list |
+| Leaving devices in UniRGB's colors | Quit hands devices back. Volatile modes revert on their own after a crash. The MSI baseline is kept on disk |
+| Runaway writes (slider drags) | Client throttling and server-side coalescing. A circuit breaker pauses an adapter after 3 consecutive failures |
 | A misbehaving adapter taking down the app | Each adapter runs on its own worker. Exceptions become error results, and timeouts return control to the UI |
 
-## Rollback
+## Removing UniRGB completely
 
-UniRGB changes nothing outside its own files. To remove it completely:
+1. In **Settings**, turn off CPU temperature and click **Remove it**. This deletes the scheduled task and the helper
+   folder in Program Files (one admin prompt).
+2. Uninstall UniRGB from Windows Settings → Apps.
+3. Optional: uninstall PawnIO from Windows Settings → Apps, if no other program uses it.
+4. Optional: delete your settings and scenes:
 
 ```cmd
 rmdir /s /q "%APPDATA%\UniRGB" "%LOCALAPPDATA%\UniRGB"
 ```
 
-Then delete the project folder. Razer lighting returns to the Synapse profile as soon as UniRGB quits (or within
-about 2 minutes if it was killed). Nothing in MSI Center, Synapse, Kreo KB Hub or OpenRGB was modified, so nothing
-needs restoring there.
-
-## Actions that need your approval (not done)
-
-0. Stopping MSI Center's lighting (`tools\msi-lighting-stop.cmd`, run as admin) to enable MSI direct writes.
-1. Downloading/installing MSI's official Mystic Light SDK (would allow board/DIMM control through MSI's own service).
-2. Installing OpenRGB + PawnIO driver (kernel driver) for SMBus/I²C devices: higher risk, not recommended while MSI Center runs.
-3. Passive USB capture (USBPcap) of Kreo KB Hub traffic to learn the keyboard protocol.
-4. Installing Node.js to run `rea` for static analysis of vendor apps.
+Devices return to their own stored lighting when UniRGB quits; nothing in Synapse, MSI Center, Kreo KB Hub or OpenRGB
+is changed.

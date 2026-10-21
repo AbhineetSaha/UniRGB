@@ -85,7 +85,7 @@ def helper_file() -> Path:
 @dataclass
 class Reading:
     celsius: float
-    source: str        # "cpu-lhm" | "cpu-amd" | "gpu-nvidia"
+    source: str        # "cpu-pawnio" | "cpu-lhm" | "cpu-amd" | "gpu-nvidia"
     label: str
     at: float
 
@@ -144,6 +144,20 @@ def read_helper_file(path: Path | None = None, now: float | None = None) -> Read
     if not isinstance(d.get("celsius"), (int, float)) or now - float(d.get("at", 0)) > STALE_S:
         return None
     return Reading(float(d["celsius"]), "cpu-amd", "CPU (AMD Ryzen Master)", float(d["at"]))
+
+
+def read_hw_helper(start=None, request=None) -> Reading | None:
+    """CPU temperature from UniRGB's own elevated helper (PawnIO). start() launches it if it is not running."""
+    if request is None:
+        from .hostos.pipe import request
+    r = request({"op": "cpu_temp"})
+    if r is None:
+        if start:
+            start()
+        return None
+    if not r.get("ok") or not isinstance(r.get("celsius"), (int, float)):
+        return None
+    return Reading(float(r["celsius"]), "cpu-pawnio", f"{r.get('label', 'CPU')} (UniRGB helper)", time.time())
 
 
 def read_nvidia(timeout: float = 5.0) -> Reading | None:

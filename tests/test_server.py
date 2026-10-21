@@ -46,6 +46,14 @@ class ServerTests(unittest.TestCase):
         except ValueError:
             return r.status, raw
 
+    def test_restart_needs_the_token_and_asks_main_to_relaunch(self):
+        self.assertEqual(self.req("POST", "/api/restart", token=False)[0], 403)
+        self.assertEqual(self.req("POST", "/api/restart")[0], 200)
+        self.assertTrue(self.app.quit_requested.wait(2))
+        self.assertTrue(self.app.restart_requested)
+        self.app.quit_requested.clear()
+        self.app.restart_requested = False
+
     def test_index_embeds_token(self):
         st, body = self.req("GET", "/", token=False)
         self.assertEqual(st, 200)
@@ -55,6 +63,18 @@ class ServerTests(unittest.TestCase):
         st, body = self.req("GET", "/favicon.ico", token=False)
         self.assertEqual(st, 200)
         self.assertEqual(body[:4], bytes([0, 0, 1, 0]), "ICO header")
+
+    def test_prefs_round_trip_and_validation(self):
+        st, body = self.req("GET", "/api/state", token=False)
+        self.assertFalse(body["prefs"]["setup_done"])
+        st, body = self.req("POST", "/api/prefs", {"setup_done": True, "cpu_temperature": True})
+        self.assertEqual(st, 200)
+        self.assertTrue(body["setup_done"] and body["needs_driver"])
+        self.assertEqual(self.req("POST", "/api/prefs", {"ram_lighting": True})[0], 400, "not available yet")
+        self.assertEqual(self.req("POST", "/api/prefs", {"admin": True})[0], 400, "unknown key")
+        self.assertEqual(self.req("POST", "/api/prefs", {"cpu_temperature": "yes"})[0], 400, "non-boolean")
+        self.assertEqual(self.req("POST", "/api/prefs", {"cpu_temperature": False}, token=False)[0], 403)
+        self.app.prefs.update({"setup_done": False, "cpu_temperature": False})
 
     def test_state(self):
         st, body = self.req("GET", "/api/state", token=False)
