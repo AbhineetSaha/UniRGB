@@ -79,6 +79,7 @@ class App:
         self.rescan_interval = rescan_interval
         self._stop = threading.Event()
         self.quit_requested = threading.Event()
+        self.restart_requested = False   # __main__ starts a fresh UniRGB after shutting this one down
         self._scan_lock = threading.Lock()
         self.last_scan: float = 0.0
         self.last_scan_ms: float = 0.0
@@ -144,7 +145,8 @@ class App:
                     log.exception("background rescan failed")
         threading.Thread(target=loop, name="rescan", daemon=True).start()
 
-    def request_quit(self) -> None:
+    def request_quit(self, restart: bool = False) -> None:
+        self.restart_requested = self.restart_requested or restart
         self.quit_requested.set()
 
     def shutdown(self) -> None:

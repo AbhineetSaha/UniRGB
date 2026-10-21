@@ -45,6 +45,15 @@ def _open_window(url: str) -> None:
     webbrowser.open(url)
 
 
+def _relaunch(argv: list[str]) -> None:
+    """Start a fresh UniRGB without a new window: the open page reconnects to it by itself."""
+    args = [a for a in argv if a != "--no-window"] + ["--no-window"]
+    cmd = [sys.executable, *args] if getattr(sys, "frozen", False) else [sys.executable, "-m", "unirgb", *args]
+    # a fresh one-file bootstrap, not a child that reuses this instance's unpacked files (deleted when we exit)
+    env = {**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"}
+    subprocess.Popen(cmd, env=env, close_fds=True, creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+
+
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["--cpu-helper"]:   # how the packaged .exe starts its elevated sensor helper
@@ -111,6 +120,9 @@ def main(argv=None) -> int:
             tray.stop()
         srv.shutdown()
         app.shutdown()
+        srv.server_close()   # free the port before the new instance binds it
+        if app.restart_requested:
+            _relaunch(argv)
     return 0
 
 

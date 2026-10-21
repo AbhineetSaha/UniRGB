@@ -128,6 +128,9 @@ def make_server(app, host: str = "127.0.0.1", port: int = 0) -> ThreadingHTTPSer
             # release device sessions, then let the main loop exit
             threading.Thread(target=app.request_quit, daemon=True).start()
             return 200, {"ok": True, "message": "UniRGB is shutting down; vendor apps take lighting back"}
+        if method == "POST" and p == ["restart"]:
+            threading.Thread(target=app.request_quit, args=(True,), daemon=True).start()
+            return 200, {"ok": True, "message": "UniRGB is restarting"}
         if method == "POST" and p == ["prefs"]:
             app.prefs.update(h._body())   # ValueError -> 400 with the reason
             return 200, prefs_payload()

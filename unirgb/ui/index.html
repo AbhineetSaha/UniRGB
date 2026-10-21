@@ -522,9 +522,20 @@ async function runSetup(enable){
   for (let i = 0; i < 30; i++){   // the elevated setup runs on its own; watch for the result
     await new Promise(res => setTimeout(res, 2000));
     const st = await api("GET", "/api/system-setup");
-    if (enable ? st.ready || (st.last_result && !st.last_result.ok && st.last_result.at * 1000 > Date.now() - 60000) : !st.task && !st.helper) break;
+    if (enable && st.ready && st.last_result?.ok) return restartApp();
+    if (enable ? st.last_result && !st.last_result.ok && st.last_result.at * 1000 > Date.now() - 60000 : !st.task && !st.helper) break;
   }
   S = await api("GET", "/api/state"); loadSetupStatus();
+}
+async function restartApp(){   // after the driver setup: UniRGB starts fresh, then this page reloads (new token)
+  $("#setupDlg").close();
+  toast("Setup done. Restarting UniRGB…", "ok");
+  await api("POST", "/api/restart");
+  for (let i = 0; i < 60; i++){   // the new instance serves a page with a new token
+    await new Promise(res => setTimeout(res, 1000));
+    try { if (!(await (await fetch("/", {cache: "no-store"})).text()).includes(TOKEN)) return location.reload(); } catch {}
+  }
+  toast("UniRGB did not come back. Start it from the Start menu.", "bad");
 }
 $("#setupBtn").onclick = () => openSetup(false);
 $("#setupSave").onclick = async () => {

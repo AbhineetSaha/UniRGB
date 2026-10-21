@@ -46,6 +46,14 @@ class ServerTests(unittest.TestCase):
         except ValueError:
             return r.status, raw
 
+    def test_restart_needs_the_token_and_asks_main_to_relaunch(self):
+        self.assertEqual(self.req("POST", "/api/restart", token=False)[0], 403)
+        self.assertEqual(self.req("POST", "/api/restart")[0], 200)
+        self.assertTrue(self.app.quit_requested.wait(2))
+        self.assertTrue(self.app.restart_requested)
+        self.app.quit_requested.clear()
+        self.app.restart_requested = False
+
     def test_index_embeds_token(self):
         st, body = self.req("GET", "/", token=False)
         self.assertEqual(st, 200)
