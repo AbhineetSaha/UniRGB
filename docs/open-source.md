@@ -12,12 +12,13 @@ proprietary software.
 
 No code was copied from any project. Each protocol module names its sources in its docstring.
 
-## Third-party software: never bundled
+## Third-party software: only PawnIO is bundled
 
 | Software | Licence | How UniRGB uses it | Shipped? |
 |---|---|---|---|
 | OpenRGB | GPL-2.0-or-later | Separate program, reached over its documented network SDK (TCP 6742). Used only for RAM lighting | No, the user installs it |
-| PawnIO | open source, signed binaries | Kernel driver used **by OpenRGB / LibreHardwareMonitor**, not by UniRGB | No |
+| PawnIO driver 2.2.0 | GPL-2.0 (source: github.com/namazso/PawnIO, tag 2.2.0) | Official signed installer, run by the one-time setup only if the user turns on CPU temperature. Licence text ships in `{app}\pawnio` | **Yes**, unmodified, SHA-256 pinned in `tools/fetch_pawnio.py` |
+| PawnIO module `AMDFamily17.bin` 0.2.11 | LGPL-2.1 (source: github.com/namazso/PawnIO.Modules) | Loaded by UniRGB's hardware helper to read the CPU temperature register | **Yes**, unmodified, SHA-256 pinned |
 | LibreHardwareMonitor | MPL-2.0 | Separate program. UniRGB reads its local web server (`/data.json`) for CPU temperature and fan speeds | No |
 | Razer Chroma SDK | proprietary | Optional fallback adapter, called over its local REST API if Synapse is installed | No (part of Synapse) |
 | AMD Ryzen Master SDK | **proprietary, redistribution forbidden** | Optional, off unless the user clicks "Use AMD Ryzen Master instead". Never the default | No |

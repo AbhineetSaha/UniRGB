@@ -50,12 +50,12 @@ def main(argv: list[str]) -> int:
     from . import system_setup
     from .app import VERSION
     from .hostos import pawnio, pipe
+    module = Path(sys.executable).parent / "modules" / "AMDFamily17.bin"   # own folder only
+    # Checked before logging: the log lives in the admin-only helper folder that setup creates.
+    if sys.platform != "win32" or not ctypes.windll.shell32.IsUserAnAdmin() or not module.is_file():
+        return 2
     logging.basicConfig(filename=str(system_setup.helper_dir() / "helper.log"), level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
-    if sys.platform != "win32" or not ctypes.windll.shell32.IsUserAnAdmin():
-        log.error("needs to run elevated through the scheduled task")
-        return 2
-    module = Path(sys.executable).parent / "modules" / "AMDFamily17.bin"   # own folder only
     try:
         dev = pawnio.PawnIO(module.read_bytes())
     except OSError as e:

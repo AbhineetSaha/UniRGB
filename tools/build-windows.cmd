@@ -8,5 +8,6 @@ echo Built dist\UniRGB.exe
 set ISCC=%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe
 if not exist "%ISCC%" set ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe
 if not exist "%ISCC%" (echo Inno Setup not found: skipping the installer & exit /b 0)
+python tools\fetch_pawnio.py || exit /b 1
 "%ISCC%" /Q installer\UniRGB.iss || exit /b 1
 echo Built the installer in dist\

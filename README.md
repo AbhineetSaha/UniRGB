@@ -36,7 +36,8 @@ cleared, and other devices keep their last color. Use **Return to vendor app** o
 - **OpenRGB**: RAM lighting. Run it as administrator, untick devices UniRGB already drives (Settings → Supported
   Devices), and start the SDK server (port 6742).
 
-UniRGB never bundles third-party or proprietary software. See [docs/open-source.md](docs/open-source.md).
+UniRGB never bundles proprietary software. The one open-source component it ships is the PawnIO driver
+installer and module (GPL-2.0 / LGPL-2.1), used only if you turn on CPU temperature in Settings. See [docs/open-source.md](docs/open-source.md).
 
 ## Safety
 
