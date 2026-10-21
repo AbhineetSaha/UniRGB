@@ -388,8 +388,15 @@ function renderMain(){
         <span class="chip">${esc(d.info.category)}</span><span class="chip">adapter: ${esc(d.info.adapter)}</span>
         ${["experimental","untested"].includes(d.caps.color) ? `<span class="chip warn">${d.caps.color} control</span>` : ""}
         ${d.shadowed_by ? `<span class="chip warn">duplicate of ${esc(d.shadowed_by)}</span>` : ""}</div></div></div>
+    ${d.info.controlled_by.some(c => c.includes("controlling the lighting")) ? `<div class="banner">Razer Synapse is controlling this mouse's lighting, so UniRGB cannot reach it. <button class="btn primary" id="dQuitSynapse" style="margin-left:8px">Quit Razer Synapse</button></div>` : ""}
     <div class="grid">${controlsCard(d)}${d.info.adapter === "razer-hid" && d.connection === "connected" ? mouseCard() : ""}${d.caps.writable && !d.shadowed_by ? stateCard(d) : ""}${capsCard(d)}${infoCard(d)}</div>`;
   wireControls(d);
+  $("#dQuitSynapse")?.addEventListener("click", async e => {
+    e.target.disabled = true;
+    const r = await api("POST", devPath(d.info.id) + "/quit-synapse");
+    toast(r.message, r._ok ? "ok" : "bad");
+    S = await api("GET", "/api/state"); render();
+  });
   if (d.caps.display === "supported" && !d.shadowed_by) loadDisplay(d);
   if (d.info.adapter === "razer-hid" && d.connection === "connected") loadMouse(d);
 }

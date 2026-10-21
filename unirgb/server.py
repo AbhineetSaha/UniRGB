@@ -176,6 +176,16 @@ def make_server(app, host: str = "127.0.0.1", port: int = 0) -> ThreadingHTTPSer
                     raise ApiError(404, "device has no CPU helper")
                 res = adapter.start_cpu_helper()
                 return (200 if res.ok else 409), {"ok": res.ok, "message": res.message}
+            if method == "POST" and action == "quit-synapse":
+                rec = app.orch.registry.get(dev)
+                adapter = app.orch.adapters.get(rec.info.adapter) if rec else None
+                if not hasattr(adapter, "quit_synapse"):
+                    raise ApiError(404, "device has no vendor app to quit")
+                res = adapter.quit_synapse()
+                if res.ok:
+                    time.sleep(1.0)   # let Synapse's last frame finish before UniRGB asks the mouse again
+                    app.rescan()
+                return (200 if res.ok else 409), {"ok": res.ok, "message": res.message}
         if p == ["scenes"] and method == "POST":
             body = h._body()
             if not isinstance(body, dict):

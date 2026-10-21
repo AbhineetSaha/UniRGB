@@ -15,8 +15,8 @@ RED, GREEN = Color(255, 0, 0), Color(0, 255, 0)
 class FakeRazerDev:
     """Answers Razer protocol requests like the Basilisk V3 Pro did on 2026-10-19."""
 
-    def __init__(self, asleep=False):
-        self.asleep = asleep
+    def __init__(self, asleep=False, synapse_streaming=False):
+        self.asleep, self.synapse_streaming = asleep, synapse_streaming
         self.requests: list[bytes] = []
         self.bright = {rz.NOSTORE: 84, rz.VARSTORE: 84}
         self._resp = bytes(91)
@@ -37,6 +37,8 @@ class FakeRazerDev:
             if args[1] == rz.ZERO_LED:
                 r[0] = 0x03            # firmware 2.50 refuses ZERO_LED reads
             r[10] = self.bright[args[0]]
+        if self.synapse_streaming:   # what the mouse showed on 2026-10-21: Synapse's custom-frame replies
+            r[0], r[1], r[6], r[7] = 0x02, 0x16, 0x0F, 0x03
         r[88] = rz.crc(r)
         self._resp = b"\x00" + bytes(r)
 
@@ -75,6 +77,17 @@ class RazerDirectTests(unittest.TestCase):
         a, [d] = self.make(dev)
         self.assertEqual(d.connection, Connection.ASLEEP)
         dev.asleep = False   # the user moved the mouse; the next rescan finds it
+        [d] = a.discover()
+        self.assertEqual(d.connection, Connection.CONNECTED)
+
+    def test_synapse_streaming_lighting_is_named_as_the_blocker(self):
+        dev = FakeRazerDev(synapse_streaming=True)
+        a = RazerDirectAdapter(lambda: [RAZER_IF0], open_device=lambda info: dev,
+                               process_provider=lambda: {"razerappengine.exe"})
+        [d] = a.discover()
+        self.assertEqual(d.connection, Connection.UNAVAILABLE)
+        self.assertIn("Razer Synapse (controlling the lighting)", d.info.controlled_by)
+        dev.synapse_streaming = False   # the user quit Synapse
         [d] = a.discover()
         self.assertEqual(d.connection, Connection.CONNECTED)
 
