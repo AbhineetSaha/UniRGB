@@ -86,10 +86,11 @@ class App:
     def _start_helper(self) -> None:
         """Start the privileged helper through its task: only if the user enabled it, at most every 30 s."""
         now = time.monotonic()
-        if self.prefs.prefs.cpu_temperature and now - self._helper_started > 30:
+        # without the driver the helper only fails; not counting that as a start lets it launch right after setup
+        if (self.prefs.prefs.cpu_temperature and now - self._helper_started > 30
+                and system_setup.driver_state() != "not-installed"):
             self._helper_started = now
-            if system_setup.driver_state() != "not-installed":   # without it the helper only fails; Settings offers setup
-                system_setup.start_helper()
+            system_setup.start_helper()
 
     def rescan(self, full: bool = False) -> None:
         with self._scan_lock:
