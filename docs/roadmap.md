@@ -1,47 +1,36 @@
 # Roadmap
 
-## Implemented (v0.1.0)
+## Done
 
-- [x] Query-only HID enumeration, CIM inventory, service-state checks
-- [x] Unified registry with desired vs confirmed state and confirmation levels
-- [x] Adapter contract, per-adapter isolation, coalescing, timeouts, circuit breaker, ownership resolution
-- [x] **Razer Chroma adapter**: Basilisk V3 Pro static color, software brightness, off, experimental zones; ChromaLink (experimental); restore; crash journal
-- [x] MSI Mystic Light read-only monitor (zones from MSI's log, service state)
-- [x] Inventory for the keyboard, mic, unknown HID device, GPUs and DRAM, with reasons for being read-only
-- [x] OpenRGB SDK adapter (opt-in; untested against a real server)
-- [x] Multi-device "Sync all", scenes (save, apply, delete, import, export)
-- [x] Desktop UI (Edge app window), diagnostics view, Quit/release, single instance
-- [x] 46 automated tests plus opt-in real-hardware tests
+- Query-only HID enumeration and a read-only inventory that explains why each device isn't controllable
+- Unified device model: desired vs confirmed state, confirmation levels, capability levels, ownership between adapters
+- Direct control: Razer Basilisk V3 Pro (color, zones, native brightness with read-back, DPI, polling rate, sleep timer,
+  battery), MSI Mystic Light 761 on tested boards, Kreo Hive RGB / Evision V2 keyboards
+- AIO pump temperature display with CPU temperature from UniRGB's own hardware helper (PawnIO)
+- First-start preferences and a one-time admin setup; no prompts on later starts
+- Tray icon, background start at sign-in, single instance, clean quit that hands devices back
+- Vendor fallbacks: Razer Chroma SDK, OpenRGB (RAM)
+- Scenes (save, apply, import, export) and "Sync all"
+- Windows installer with a hash-pinned PawnIO bundle; CI, CodeQL and protected `main`
 
-## Implemented (v0.2)
+## Next
 
-- [x] Direct HID transport, Razer protocol, MSI 761 protocol
-- [x] Razer Basilisk V3 Pro direct: color, native brightness with read-back, zones, partial restore
-- [x] MSI Mystic Light direct: setup read, baseline, gated writes, restore (verified on the real board 2026-10-19)
-
-## Next priorities (in order)
-
-1. **User confirmation of physical results.** Do the Basilisk's colors and zones match? Does ChromaLink move the MSI board LEDs?
-   Fix the zone map or promote ChromaLink from experimental depending on the answer.
-2. **MSI official Mystic Light SDK adapter** (needs approval to install the SDK). Board headers and DIMMs through MSI's own
-   service, with read-back (`MLAPI_GetLedColor`), so no contention.
-3. **Animated effects engine.** App-driven frames (breathing, spectrum, wave) streamed through `CHROMA_CUSTOM2`. The
-   coalescing orchestrator is already the right primitive. Needs a frame-rate cap and a CPU budget test.
-4. **Kreo Hive keyboard.** Passive USB capture (approval), protocol notes, then a read-only "identify" probe before any write.
-5. **Device-change notifications** (`RegisterDeviceNotification` / CM_Register_Notification) instead of 15 s polling.
-6. **Tray icon / autostart** (optional), and packaging (PyInstaller one-file build).
-7. Verify the OpenRGB adapter against a real OpenRGB 1.0 server, with MSI lighting turned off.
+1. **RAM lighting without OpenRGB.** A read-only SMBus probe for ENE DRAM controllers first, then writes through the
+   hardware helper, with SPD hubs and power controllers permanently excluded.
+2. **Windows Dynamic Lighting (LampArray).** A standard adapter that controls any device exposing the HID LampArray
+   usage, from any vendor.
+3. **Uninstall cleanup.** The uninstaller should also remove the hardware helper and its scheduled task. Until then,
+   turn off CPU temperature in Settings (which removes them) before uninstalling.
+4. **Animated effects engine.** App-driven frames (breathing, spectrum, wave) with a frame-rate cap and a CPU budget test.
+5. **Device-change notifications** instead of polling every 15 s.
+6. **More devices** through device-support requests: each needs a read-only probe log and a real-hardware test.
+7. **Code signing and winget** so Windows stops warning on download.
 
 ## Known limitations
 
-- Chroma has no read-back, so Razer state is "api-accepted", never "hardware-readback".
-- Another Chroma app with higher priority in Synapse can override UniRGB even when the API reports success.
-- Brightness on Razer and OpenRGB paths is color scaling, not hardware brightness.
-- Closing the window does not quit. Use **Quit** to hand lighting back.
-- Only one Razer device class (mouse) is mapped from HID. Razer keyboards/headsets would need endpoint mapping (`/keyboard`, `/headset`) and their grids.
-- Fan control, performance profiles and displays: not implemented. No safe, documented path was found on this machine.
-- Windows only for discovery (the HID/SCM modules return nothing on other OSes).
-
-## Open decisions for the user
-
-See "Actions that need your approval" in `security-and-safety.md`.
+- Windows only. Linux and macOS have no device backends.
+- Razer zone positions follow OpenRGB's table and haven't been checked against the physical LEDs.
+- The Chroma SDK path cannot read lighting back; brightness on Chroma and OpenRGB paths is color scaling.
+- An app update needs one admin prompt to refresh the hardware helper.
+- CPU temperature through the helper supports AMD Zen CPUs only.
+- Fan control is not implemented: no safe, documented path exists yet.

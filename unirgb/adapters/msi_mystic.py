@@ -9,7 +9,7 @@ Evidence on this machine:
 Writes are BLOCKED on purpose: there is no official MSI SDK on this machine
 (MysticLight_SDK.dll is absent), and sending the community-documented 761-byte
 feature report ourselves would race MSI Center's service, which writes to the same
-controller. See docs/reverse-engineering-findings.md.
+controller. See docs/reverse-engineering-findings.md (vendor software notes).
 """
 from __future__ import annotations
 

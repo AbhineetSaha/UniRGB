@@ -1,83 +1,73 @@
-# Direct device control (vendor apps bypassed)
+# Direct device control
 
-Since v0.2 UniRGB talks to the hardware itself over HID feature reports. The vendor APIs (Chroma SDK) remain as a
-fallback. When a direct adapter can reach a device, it owns it (priority 5 vs 10), and the vendor entry is shown as a duplicate.
-Start with `--no-direct` to go back to vendor-only control.
+UniRGB talks to supported devices itself, over HID reports, without their vendor apps. When a direct adapter can reach a
+device it owns it (priority 5), and any vendor-API entry for the same device is shown as a duplicate. Start with
+`--no-direct` to use vendor APIs only.
 
 ## Protocol sources
 
-| Device | Protocol | Source of facts | Licence note |
-|---|---|---|---|
-| Razer Basilisk V3 Pro (1532:00AB / 00AA) | Razer 90-byte report, transaction 0x1F, XOR CRC over bytes 2–87, extended-matrix class 0x0F | openrazer `driver/razercommon.[ch]`, `razerchromacommon.c`, `razermouse_driver.c`, daemon `mouse.py` (matrix 1×13) | Protocol facts re-implemented. No openrazer (GPL-2.0) code copied |
-| MSI Mystic Light 761 (0DB0:0076) | Setup report 0x50 (290 B), per-zone direct report 0x51 | OpenRGB `MSIMotherboard761Controller.cpp` @ e6a96c6 (2026-10-18). MS-7E70 is in its board table as zone-based direct | Same: facts only. No OpenRGB (GPL-2.0-or-later) code copied |
-
-## Verified on this machine (2026-10-19)
-
-### Razer Basilisk V3 Pro: working directly
-
-| Test | Result |
-|---|---|
-| Transport | Feature report 0 on interface 0 through a query-only handle (Windows holds the mouse collection exclusively, but feature reports still pass) |
-| Asleep mouse | Receiver echoes the command with status 0x04 "timeout". UniRGB marks the device *unavailable* and falls back to Chroma |
-| Firmware read | v2.50 |
-| Static red / blue 40 % / zones / off | Device status 0x02 "ok" every time, 64–194 ms per apply |
-| Brightness read-back | `get brightness` with `ZERO_LED` → "failure" on fw 2.50. With LOGO (0x04) or SCROLL (0x01) it works. Live (NOSTORE) read 102 after setting 102. **Saved (VARSTORE) stayed 84**, which proves UniRGB does not modify the stored profile |
-| Apply verification | Each apply reads brightness back and fails if it differs (70 % → 70 %, 25 % → 25 % confirmed) |
-| Restore | Live brightness reset to the saved 33 % (84/255) and read back |
-
-Not verified: physical colors and zone positions (the agent cannot see LEDs). Zone columns follow OpenRGB:
-scroll 0, logo 1, strip 2–12.
-
-### MSI Mystic Light: working directly (after MSI Center lighting was stopped)
-
-| Test | Result |
-|---|---|
-| Open | Read/write handle granted while MSI Center runs |
-| GET 0x50 | Valid 290-byte setup: JARGB1–3 and JAF in mode 2, LED count 30. JRGB1 active. Rows match OpenRGB's layout |
-| Baseline | Saved automatically to `%LOCALAPPDATA%\UniRGB\msi761_baseline.bin` (290 bytes). The first capture is never overwritten |
-| Gating | Writes are refused while `Mystic_Light_Service`, `LightKeeperService` or `LEDKeeper2` run. After the user approved the elevated stop script (UAC), all three stayed stopped for more than 15 s and MSI Center did not restart them |
-| Direct setup | After the first write, GET 0x50 reads back JARGB1–3 and JAF as mode 9, flags 0x15, 30 LEDs, with other rows off. **Hardware read-back confirms the controller entered direct mode** |
-| Color writes | All red · per-zone (green/blue/white/magenta) · cyan 30 % · off: every SET 0x51 accepted, about 28 ms per full apply (5 reports). **The user confirmed visually that the board lights followed the sequence** (red → mixed → dim cyan → off). Which header got which color in the mixed step was not checked individually |
-| Restore | Baseline written back. GET 0x50 then matched the saved baseline **byte for byte** |
-
-### Ant Esports ICE-Storm 360 ARGB: pump-cap temperature display (replaces the Ant Esports app)
-
-| Item | Finding |
-|---|---|
-| Device | The "unidentified" HID 5131:2007 (consumer page, 65-byte reports, no strings) is the pump-cap display. 5131:2007 is a generic chip that other vendors reuse with different framing. It is treated as this cooler because you identified it |
-| Protocol | 65-byte HID **output** report: `[0x00, 0x40, temp, …]`, bit 7 of `temp` = °F. Taken from the MIT-licensed [neonvarun/AntEsports-Cooler-Controller](https://github.com/neonvarun/AntEsports-Cooler-Controller) (ICE-Infinity/ICE-Flow family) |
-| Display test | Writes of 42, 55, 77 accepted (65/65 bytes) |
-| CPU temperature | Ryzen temperature needs a kernel driver and admin rights. AMD's own signed Ryzen Master SDK CLI is used, and its driver (`AMDRyzenMasterDriverV29`) was already installed and running. On this Zen 5 CPU `--api GetCurrentTemperature` answers **"Deprecated API. Use GetPMTableData"**. `-a GetPMTableData` (read-only) works: 47.3–47.6 °C at idle, and you confirmed the pump display showed about 47 |
-| Privilege split | The UniRGB server stays unprivileged. `python -m unirgb.cpu_temp_helper` starts elevated (one UAC prompt from the display card), writes `%LOCALAPPDATA%\UniRGB\cpu_temp.json` every few seconds, and exits when UniRGB exits. If the CLI fails 5 times it stops and saves the CLI output in `cpu_temp.error` |
-| Fallback | Without the helper the display shows the **GPU** temperature (nvidia-smi, no admin), labelled as GPU in the UI |
-| Anti-blink | The stock panel flashes at 85 °C and above. The default holds the display at 84. "Compress" maps 75–100 to 75–84. "Raw" disables both |
-| Not here | Pump and fan ARGB run from the motherboard ARGB headers: set them with the MSI Mystic Light (direct) entry |
-
-## Turning on MSI direct control
-
-1. Right-click `tools\msi-lighting-stop.cmd` → **Run as administrator**. It stops the two services and LEDKeeper2. It disables or uninstalls nothing.
-2. In UniRGB press **Rescan**. "MSI Mystic Light (direct)" becomes controllable (experimental).
-3. To hand back: **Return to vendor app** in UniRGB (writes the saved baseline back), then run `tools\msi-lighting-start.cmd` as administrator, or just reboot.
-
-What direct mode changes on the board, the same as OpenRGB's tested layout:
-- JARGB_V2_1, JARGB_V2_2, JARGB_V2_3 and EZ Conn (JAF) are driven per zone, each with MSI's configured LED count (30).
-- **The 12 V JRGB1 header is switched off** while in direct mode. This protocol has no direct packet for it.
-- **RAM lighting is untouched.** MSI drives the DIMMs over SMBus, not through this USB controller, so they keep whatever
-  effect was last stored in them. (An earlier version of this doc said they were switched off. That was an assumption, not an observation.)
-
-## Not done, and why
-
-| Device | Status | Reason |
+| Device | Protocol | Source of facts |
 |---|---|---|
-| Kreo Hive RGB (320F:5055) | read-only | Its vendor collection FF1C:0092 is the usage page OpenRGB's Evision drivers use, but 320F:5055 is in neither the V1 nor the V2 detector list. Evision commands write keyboard flash. Sending a guessed protocol version is the "blind replay" the project rules forbid. Next step: passive USB capture (your approval) or a vendor spec |
-| G.Skill DDR5 | **through OpenRGB (your decision)**: UniRGB sends colors to OpenRGB, which does the SMBus writes. Earlier rule, now superseded: | You asked for risk-free RAM handling. Any SMBus write carries some risk of corrupting a DIMM's SPD chip, so UniRGB has no RAM write path at all (a test enforces this). Risk-free options: leave the effect stored in the DIMMs, or set it once with MSI Center (the vendor-tested path); the DIMMs keep it after MSI Center is disabled again |
-| Gigabyte RTX 5070 Ti | read-only | See the GPU section once it is assessed |
+| Razer Basilisk V3 Pro (1532:00AA wired, 1532:00AB HyperSpeed) | 90-byte feature report, transaction ID 0x1F, XOR CRC over bytes 2–87, extended-matrix class 0x0F | openrazer `driver/razercommon.[ch]`, `razerchromacommon.c`, `razermouse_driver.c`; matrix 1×13 from the daemon's `mouse.py` |
+| MSI Mystic Light 761 (0DB0:0076) | Setup report 0x50 (290 bytes), per-zone direct report 0x51 | OpenRGB `MSIMotherboard761Controller.cpp` and its board table |
+| Kreo Hive RGB / Evision V2 (320F:5055) | Vendor collection FF1C:0092, live "dynamic colors" | OpenRGB's Evision V2 keyboard controller |
+| Ant Esports pump display (5131:2007) | 65-byte HID output report `[0x00, 0x40, temp, …]`, bit 7 of `temp` = °F | [AntEsports-Cooler-Controller](https://github.com/neonvarun/AntEsports-Cooler-Controller) (MIT) |
 
-## Risks you are accepting with direct control
+Protocol facts are re-implemented; no code from these projects is copied.
 
-- Synapse keeps running unless you quit it and may re-apply its lighting over UniRGB's. Both send feature reports
-  to the same interface. UniRGB matches replies by command ID and retries, so a collision costs one retry, not a corrupted state.
-- The MSI controller family had bricking reports on **untested** boards in the past. UniRGB refuses to write unless the board
-  string contains `MS-7E70` (OpenRGB-tested) and only sends OpenRGB's tested setup layout.
-- Nothing here writes persistent storage on the mouse (NOSTORE). The MSI setup is volatile until MSI Center rewrites it.
-  A baseline copy is kept regardless.
+## Razer Basilisk V3 Pro
+
+* **Transport:** feature report 0 on interface 0, through a handle opened without read/write access. Windows holds the
+  mouse collection exclusively, but feature reports still pass.
+* **Volatile only:** lighting uses NOSTORE, so the profile saved on the mouse is never changed. A sleep/wake, a replug
+  or Synapse brings the saved look back, and UniRGB re-applies its color when the mouse wakes.
+* **Read-back:** each apply reads the brightness back and fails if it differs. On firmware 2.50 a brightness read with
+  `ZERO_LED` returns "failure", so UniRGB reads the LOGO LED instead.
+* **Asleep:** when the wireless mouse sleeps, the receiver answers with status 0x04 "timeout". UniRGB shows the mouse
+  as **Asleep** and reconnects on the next rescan after it wakes (within about 15 s).
+* **Razer Synapse:** Synapse uses the same interface. UniRGB matches replies by command class and ID and retries, so an
+  occasional collision costs a retry. When Synapse runs a lighting effect it streams frames (class 0x0F, ID 0x03) many
+  times a second, and UniRGB's commands can't get through. UniRGB detects any of Synapse's replies during discovery,
+  marks the mouse as controlled by Synapse, and offers **Quit Razer Synapse**.
+* **Zones:** columns follow OpenRGB's table (scroll 0, logo 1, strip 2–12). Not yet checked against the physical LEDs.
+* **Mouse settings:** DPI and stages, polling rate and sleep timer are read from the mouse. The first values read are
+  saved as a baseline so they can be restored.
+
+## MSI Mystic Light 761
+
+* **Board gate:** writes only when the board string contains a board from OpenRGB's tested list (currently `MS-7E70`).
+  This controller family has had bricking reports on untested boards.
+* **Vendor gate:** writes are refused while `Mystic_Light_Service`, `LightKeeperService` or `LEDKeeper2` run, because
+  MSI Center streams colors to the same controller.
+* **Baseline:** the first setup read (290 bytes) is saved to `%LOCALAPPDATA%\UniRGB\msi761_baseline.bin` and never
+  overwritten. **Return to vendor app** writes it back.
+* **What direct mode changes:** JARGB_V2_1–3 and EZ Conn (JAF) are driven per zone with MSI's configured LED count. The
+  12 V JRGB1 header is switched off while in direct mode, because this protocol has no direct packet for it. RAM
+  lighting is not affected: MSI drives the DIMMs over SMBus, not through this controller.
+
+### Turning on MSI direct control
+
+1. Right-click `tools\msi-lighting-stop.cmd` → **Run as administrator**. It stops MSI's lighting services and
+   LEDKeeper2. It disables or uninstalls nothing.
+2. Press **Rescan** in UniRGB. "MSI Mystic Light (direct)" becomes controllable.
+3. To hand back: **Return to vendor app** in UniRGB, then run `tools\msi-lighting-start.cmd` as administrator, or reboot.
+
+`tools\vendor-autostart-disable.cmd` (as administrator) stops Razer Synapse and MSI Center from starting with Windows,
+with a backup; `tools\vendor-autostart-restore.cmd` undoes it. Nothing is uninstalled.
+
+## Kreo Hive RGB
+
+* Only live "dynamic colors" are used; nothing is written to the keyboard's stored profiles.
+* A keepalive re-sends the colors every 150 ms. When UniRGB stops or crashes, the keyboard returns to its stored effect
+  within about 200 ms by itself.
+
+## Pump temperature display
+
+* **Confirmation first:** 5131:2007 is a generic chip that other gadgets (for example USB relay boards) also use. UniRGB
+  sends nothing until the user confirms the device is their cooler display.
+* **Temperature sources, in order:** UniRGB's hardware helper (AMD Zen, through PawnIO, if CPU temperature is turned on
+  in Settings) → LibreHardwareMonitor's web server → AMD Ryzen Master (only if the user opts in) → GPU temperature from
+  `nvidia-smi`, labelled as GPU.
+* **No flashing:** the stock panel flashes at 85 °C and above. The default holds the display at 84; "Compress" maps
+  75–100 to 75–84; "Raw" sends the real value.
+* Pump and fan ARGB lighting come from the motherboard's ARGB headers, not from this device.
