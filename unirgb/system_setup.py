@@ -73,7 +73,37 @@ def driver_state(service_state=windows_system.service_state, dll: Path = pawnio.
     return state if dll.is_file() else "not-installed"
 
 
-def enable(user_sid: str, src_exe: Path, run=_run, driver=driver_state, dst: Path | None = None) -> list[str]:
+def _end_helper(run, dst: Path) -> None:
+    """Stop a running helper. Ending the task alone is not enough: the one-file exe runs a child process that
+    outlives it and keeps UniRGB.exe locked. So: ask it over the pipe, end the task, then close any process still
+    running the helper's own exe (matched by full path, never the UniRGB app)."""
+    if dst == helper_dir():   # the real helper; tests use other folders and must not stop it
+        try:
+            from .hostos import pipe
+            pipe.request({"op": "stop"}, timeout_s=1.0)
+        except Exception:
+            pass
+    run(["schtasks", "/end", "/tn", TASK_NAME])
+    exe = str(dst / "UniRGB.exe").replace("'", "''")
+    run(["powershell", "-NoProfile", "-NonInteractive", "-Command",
+         "Get-CimInstance Win32_Process -Filter \"Name='UniRGB.exe'\" | "
+         f"Where-Object {{ $_.ExecutablePath -eq '{exe}' }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }}"])
+
+
+def _while_running(action, end_helper, tries: int):
+    """Run action; while a running helper keeps the file locked, stop it (the app may restart it) and retry."""
+    for i in range(tries):
+        try:
+            return action()
+        except PermissionError:
+            if i == tries - 1:
+                raise
+            end_helper()
+            time.sleep(0.25)
+
+
+def enable(user_sid: str, src_exe: Path, run=_run, driver=driver_state, dst: Path | None = None,
+           wait_tries: int = 20) -> list[str]:
     steps = []
     bundle, dst = bundle_dir(src_exe), dst or helper_dir()
     state = driver()
@@ -96,9 +126,10 @@ def enable(user_sid: str, src_exe: Path, run=_run, driver=driver_state, dst: Pat
         steps.append("PawnIO already installed")
 
     (dst / "modules").mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src_exe, dst / "UniRGB.exe")
-    for mod in sorted((bundle / "modules").glob("*.bin")):
-        shutil.copy2(mod, dst / "modules" / mod.name)
+    _end_helper(run, dst)   # refreshing: the old helper keeps its .exe locked while it runs
+    for src, target in [(src_exe, dst / "UniRGB.exe"),
+                        *((m, dst / "modules" / m.name) for m in sorted((bundle / "modules").glob("*.bin")))]:
+        _while_running(lambda: shutil.copy2(src, target), lambda: _end_helper(run, dst), wait_tries)
     steps.append(f"copied the helper to {dst}")
 
     with tempfile.TemporaryDirectory() as tmp:   # the elevated process's own temp folder
@@ -113,16 +144,14 @@ def enable(user_sid: str, src_exe: Path, run=_run, driver=driver_state, dst: Pat
 
 def disable(run=_run, dst: Path | None = None, wait_tries: int = 20) -> list[str]:
     dst = dst or helper_dir()
-    run(["schtasks", "/end", "/tn", TASK_NAME])      # a running helper keeps its .exe locked
+    _end_helper(run, dst)   # a running helper keeps its .exe locked
     run(["schtasks", "/delete", "/tn", TASK_NAME, "/f"])   # fine if it was never created
     # Delete only what enable() and the helper created, never the folder blindly.
     for f in [dst / "UniRGB.exe", dst / "setup-result.json", dst / "helper.log", *(dst / "modules").glob("*.bin")]:
-        for _ in range(wait_tries):   # the ended helper may take a moment to release its files
-            try:
-                f.unlink(missing_ok=True)
-                break
-            except PermissionError:
-                time.sleep(0.25)
+        try:
+            _while_running(lambda: f.unlink(missing_ok=True), lambda: _end_helper(run, dst), wait_tries)
+        except PermissionError:
+            pass   # left behind; the folder stays and Settings still shows it
     for d in (dst / "modules", dst):
         try:
             d.rmdir()
