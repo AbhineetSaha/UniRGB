@@ -58,13 +58,13 @@ Short records of the decisions that shape UniRGB: the options, what was chosen, 
 * **Decision:** the user opts in at first start. A one-time elevated setup installs the open-source PawnIO driver
   (bundled, hash-pinned), copies the helper to an admin-only folder in Program Files, and registers an on-demand task
   with no triggers. The app starts it with `schtasks /run`, so later starts need no prompt.
-* **Helper rules:** fixed arguments; modules loaded only from its own folder; requests limited to `ping`, `cpu_temp`
-  and `stop`; a named pipe whose ACL admits only the signed-in user and SYSTEM, rejects remote clients and refuses a
+* **Helper rules:** fixed arguments; modules loaded only from its own folder; requests limited to `ping`,
+  `cpu_temp`, `ram_list`, `ram_set`, `ram_release` and `stop`; a named pipe whose ACL admits only the signed-in user and SYSTEM, rejects remote clients and refuses a
   second server; exits on `stop` or after 60 s idle.
 * **Trade-off:** an app update makes the Program Files copy stale, which costs one prompt to refresh. Settings detects
   this by size and timestamp and asks.
 
 ## ADR-10 · First-start preferences
 * Features that need the driver are opt-in and saved in `prefs.json`. Only known keys and booleans are accepted, and
-  features that aren't available yet (RAM) can't be switched on. The app starts the helper only when the preference is
+  features that aren't available yet can't be switched on. The app starts the helper only when the preference is
   on and the driver is installed.

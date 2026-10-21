@@ -15,7 +15,7 @@ against real hardware) · **B** blocked (possible in principle, deliberately not
 | RAM via OpenRGB (`openrgb`) | E | E (OpenRGB read-back) | E | E (software scaling) | static, off | – | E | – |
 | MSI controller monitor (`msi`) | S | B | B | B | B | listed | – | – |
 | GPU lighting (`inventory`) | S | B | B | B | B | – | – | – |
-| RAM, UniRGB's own path (`inventory`) | S | B | B | B | B | – | – | – |
+| **RAM, ENE DRAM controllers via the hardware helper** (`ram`) | S (name and LED count verified) | – | E (device ack) | E (software scaling) | static, off | – | S (direct mode off: stored effect returns) | nothing persistent was changed (never saved) |
 | `[SIM]` devices (`--simulate` only) | S* | S* | S* | S* | S* | S* | S* | – |
 
 \* Simulation only. Proves the architecture, not hardware.
@@ -31,14 +31,13 @@ reports from other hardware are welcome in a [device-support issue](https://gith
 | MSI Mystic Light 761 (0DB0:0076) | MS-7E70 (X870E GAMING PLUS WIFI) | Direct mode confirmed by setup read-back. Colors visually confirmed. Restore matched the baseline byte for byte |
 | Kreo Hive RGB (320F:5055) | – | Whole-keyboard color acknowledged; reverts to its stored effect when UniRGB stops |
 | Ant Esports ICE-Storm 360 pump display (5131:2007) | – | Temperatures displayed as sent; CPU temperature through the hardware helper on a Ryzen 7 9800X3D (Zen 5) |
-| RAM: 2 × G.Skill DDR5 (ENE controllers) via OpenRGB 1.1 | – | Colors accepted and read back by OpenRGB for both modules |
+| RAM: 2 × G.Skill DDR5, ENE `AUDA0-E6K5-0101` at 0x71 / 0x73 | MS-7E70, AMD FCH SMBus | Identified (8 LEDs each). Direct red on one stick for 10 s, then back to its stored effect, by UniRGB's own code. Also colors through OpenRGB 1.1 |
 
 ## Why each B
 
 | Device | Reason |
 |---|---|
 | MSI controller monitor | Superseded by the direct adapter on tested boards. On other boards the 761-byte protocol is unverified, and MSI's own service writes the same controller |
-| RAM (own path) | UniRGB has no SMBus write code yet. RAM support is being built read-only first, with addresses that must never be touched (SPD hubs, power controllers) excluded |
 | GPU | Lighting sits behind I²C on the graphics card, which is outside UniRGB's safety boundary for now |
 
 Protocol details and the evidence behind each **S**: [direct-control.md](direct-control.md).

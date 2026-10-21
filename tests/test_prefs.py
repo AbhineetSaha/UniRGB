@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from unirgb.prefs import PrefsStore
@@ -31,9 +32,12 @@ class PrefsStoreTests(unittest.TestCase):
 
     def test_rejected_update_changes_nothing(self):
         s = PrefsStore(self.path)
-        for bad in ({"ram_lighting": True}, {"admin": True}, {"cpu_temperature": 1}, ["setup_done"]):
+        for bad in ({"admin": True}, {"cpu_temperature": 1}, ["setup_done"]):
             with self.assertRaises(ValueError):
                 s.update(bad)
+        with mock.patch.dict("unirgb.prefs.AVAILABLE", {"ram_lighting": False}):   # a feature not shipped yet
+            with self.assertRaises(ValueError):
+                s.update({"ram_lighting": True})
         self.assertFalse(self.path.exists())
 
 

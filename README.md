@@ -13,7 +13,7 @@ License: **GPL-3.0-or-later** · Windows 10/11 · written in Python (standard li
 | MSI Mystic Light 761 controller (0DB0:0076) on tested boards (MS-7E70: X870E GAMING PLUS WIFI) | ARGB and EZ Conn headers per zone, setup read-back, restore of the original setup | Direct HID. Blocked while MSI Center's lighting runs |
 | Kreo Hive RGB and other Evision V2 keyboards (320F:5055) | Whole-keyboard color, off | Direct HID, live colors only. The keyboard returns to its stored lighting by itself when UniRGB stops |
 | Ant Esports AIO pump display (5131:2007) | CPU or GPU temperature, °C/°F, no flashing above 84 °C | HID output reports. **Sends nothing until you confirm** the device is your cooler, because other gadgets use the same chip |
-| RAM | Color through OpenRGB, if you run it | Optional. UniRGB's own RAM support is in progress |
+| RAM with ENE controllers (for example G.Skill DDR5) on AMD boards | Color per stick, off | Through UniRGB's hardware helper, after you turn on RAM lighting. Colors are never saved to the sticks. OpenRGB also works if you run it |
 | Razer Chroma devices | Color through Razer's Chroma SDK | Fallback when Razer Synapse is installed |
 | Everything else | Listed with the reason it isn't controllable | Read-only inventory |
 
@@ -34,7 +34,8 @@ UniRGB asks which features you want:
 - **CPU temperature on the pump display** needs the PawnIO driver. If you tick it, UniRGB asks for administrator
   rights **once** to install PawnIO (bundled with UniRGB) and a small background helper. Later starts need no prompt.
   You can turn it off again in **Settings**, which removes the helper.
-- **RAM lighting** is shown as coming soon.
+- **RAM lighting** also needs PawnIO and the helper (the same one-time prompt). Each stick then appears as its own
+  device. Colors are live only: quitting UniRGB, or a full power-off, returns the sticks to their own effect.
 
 UniRGB runs in the background. Its icon sits in the notification area (the ^ arrow next to the clock): click it to
 open the window, right-click for **Quit**. Quitting hands every device back to its own stored lighting.

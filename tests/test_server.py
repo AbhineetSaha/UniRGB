@@ -3,6 +3,7 @@ import json
 import tempfile
 import threading
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from unirgb.adapters.simulated import SimulatedAdapter
@@ -70,7 +71,8 @@ class ServerTests(unittest.TestCase):
         st, body = self.req("POST", "/api/prefs", {"setup_done": True, "cpu_temperature": True})
         self.assertEqual(st, 200)
         self.assertTrue(body["setup_done"] and body["needs_driver"])
-        self.assertEqual(self.req("POST", "/api/prefs", {"ram_lighting": True})[0], 400, "not available yet")
+        with mock.patch.dict("unirgb.prefs.AVAILABLE", {"ram_lighting": False}):
+            self.assertEqual(self.req("POST", "/api/prefs", {"ram_lighting": True})[0], 400, "not available yet")
         self.assertEqual(self.req("POST", "/api/prefs", {"admin": True})[0], 400, "unknown key")
         self.assertEqual(self.req("POST", "/api/prefs", {"cpu_temperature": "yes"})[0], 400, "non-boolean")
         self.assertEqual(self.req("POST", "/api/prefs", {"cpu_temperature": False}, token=False)[0], 403)

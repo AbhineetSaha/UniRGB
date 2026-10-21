@@ -33,7 +33,7 @@ graph TD
   end
   subgraph ELEV[Elevated, optional]
     TASK[(Scheduled task<br/>UniRGB Hardware Helper)]
-    HELPER[hardware_helper.py<br/>ping, cpu_temp, stop]
+    HELPER[hardware_helper.py<br/>ping, cpu_temp, ram_*, stop]
     PAWN[hostos/pawnio.py → PawnIO driver]
   end
   PAGE -- fetch JSON --> SRV --> APP

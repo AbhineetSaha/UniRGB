@@ -12,7 +12,7 @@ from pathlib import Path
 
 FIELDS = ("setup_done", "cpu_temperature", "ram_lighting")
 # RAM lighting stays unavailable until UniRGB's own helper can write (today only a read-only probe exists).
-AVAILABLE = {"cpu_temperature": True, "ram_lighting": False}
+AVAILABLE = {"cpu_temperature": True, "ram_lighting": True}
 
 
 @dataclass

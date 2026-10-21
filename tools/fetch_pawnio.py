@@ -18,7 +18,7 @@ MODULES = ("https://github.com/namazso/PawnIO.Modules/releases/download/0.2.11/r
            "43608cb89bc84247fef1368a139013f7d043e17db6d6c8dfc9b46bf0905a81f4")
 LICENSE = ("https://raw.githubusercontent.com/namazso/PawnIO/2.2.0/COPYING",
            "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643")
-NEEDED_MODULES = ("AMDFamily17.bin",)   # CPU temperature; add SmbusPIIX4.bin once RAM lighting can write
+NEEDED_MODULES = ("AMDFamily17.bin", "SmbusPIIX4.bin")   # CPU temperature; RAM lighting (AMD SMBus)
 
 
 def fetch(url: str, sha256: str, urlopen=urllib.request.urlopen) -> bytes:

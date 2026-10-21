@@ -504,7 +504,7 @@ function openSetup(first){
   $("#prefRam").checked = P.ram_lighting;
   $("#prefRam").disabled = !P.available.ram_lighting;
   $("#ramChip").textContent = P.available.ram_lighting ? "Needs driver" : "Coming soon";
-  $("#ramNote").textContent = P.available.ram_lighting ? "" : "UniRGB's own RAM support can only read so far. Until it can set colors, RAM lighting keeps working through OpenRGB if you run it.";
+  $("#ramNote").textContent = P.available.ram_lighting ? "RAM lighting supports ENE controllers (for example G.Skill and other DDR5 kits) on AMD boards. Colors are never saved to the sticks." : "";
   $("#setupDlg").showModal();
   loadSetupStatus();
 }

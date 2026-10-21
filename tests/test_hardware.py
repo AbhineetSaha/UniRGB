@@ -30,7 +30,7 @@ class HardwareDiscovery(unittest.TestCase):
         try:
             app.rescan(full=True)
             health = app.orch.health()
-            self.assertEqual(set(health), {"cooler", "kreo-hid", "razer-hid", "msi-hid", "razer", "openrgb", "msi", "inventory"})
+            self.assertEqual(set(health), {"cooler", "kreo-hid", "razer-hid", "msi-hid", "ram", "razer", "openrgb", "msi", "inventory"})
             self.assertTrue(all(not h.detail.startswith("discovery failed") for h in health.values()), health)
         finally:
             app.shutdown()
