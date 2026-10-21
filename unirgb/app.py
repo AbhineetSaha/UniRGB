@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 import threading
 import time
 from pathlib import Path
@@ -152,3 +153,6 @@ class App:
     def shutdown(self) -> None:
         self._stop.set()
         self.orch.shutdown()
+        if sys.platform == "win32" and self.prefs.prefs.cpu_temperature:   # the elevated helper quits with us
+            from .hostos import pipe
+            pipe.request({"op": "stop"}, timeout_s=1.0)

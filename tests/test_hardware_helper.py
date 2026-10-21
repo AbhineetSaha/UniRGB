@@ -71,7 +71,8 @@ class PipeRoundTripTests(unittest.TestCase):
         with mock.patch.object(pipe, "PIPE_NAME", name):
             ready = threading.Event()
             h = Handler(lambda off: int(55 / 0.125) << 21, "test")
-            t = threading.Thread(target=lambda: (ready.set(), pipe.serve(system_setup.current_user_sid(), h)), daemon=True)
+            t = threading.Thread(target=lambda: (ready.set(), pipe.serve(system_setup.current_user_sid(), h,
+                                                                         should_stop=lambda: h.stopping)), daemon=True)
             t.start()
             ready.wait(2)
             reply = None
@@ -82,6 +83,9 @@ class PipeRoundTripTests(unittest.TestCase):
                 threading.Event().wait(0.05)
             self.assertEqual(reply, {"ok": True, "celsius": 55.0, "label": "CPU (Tctl)"})
             self.assertEqual(pipe.request({"op": "nope"}), {"ok": False, "error": "unknown request"})
+            self.assertEqual(pipe.request({"op": "stop"}), {"ok": True})   # what UniRGB sends when it quits
+            t.join(2)
+            self.assertFalse(t.is_alive(), "the helper stops serving after 'stop'")
 
     def test_no_helper_gives_up_fast(self):
         import time

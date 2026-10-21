@@ -3,6 +3,7 @@
 It answers a fixed list of requests over the local pipe and nothing else:
   ping      -> {"ok": true, "version": ...}
   cpu_temp  -> {"ok": true, "celsius": ..., "label": ...}   (AMD Zen, read-only)
+  stop      -> {"ok": true}, then the helper exits (UniRGB quitting)
 It loads PawnIO modules only from its own folder, takes no arguments that change what it does,
 and exits after IDLE_S without requests, so it never outlives UniRGB.
 """
@@ -18,7 +19,7 @@ from pathlib import Path
 
 log = logging.getLogger("unirgb.helper")
 IDLE_S = 60.0
-OPS = ("ping", "cpu_temp")
+OPS = ("ping", "cpu_temp", "stop")
 TCTL_SMN = 0x59800   # SMU::THM::THM_TCON_CUR_TMP on Zen (Linux k10temp driver, facts only)
 
 
@@ -32,6 +33,7 @@ class Handler:
     def __init__(self, read_smn, version: str):
         self._read_smn, self._version = read_smn, version
         self.last = time.monotonic()
+        self.stopping = False
 
     def __call__(self, req: dict) -> dict:
         self.last = time.monotonic()
@@ -40,6 +42,9 @@ class Handler:
             return {"ok": False, "error": "unknown request"}
         if op == "ping":
             return {"ok": True, "version": self._version}
+        if op == "stop":
+            self.stopping = True   # pipe.serve returns after sending this reply
+            return {"ok": True}
         try:
             return {"ok": True, "celsius": round(decode_tctl(self._read_smn(TCTL_SMN)), 1), "label": "CPU (Tctl)"}
         except (OSError, TimeoutError) as e:
@@ -77,7 +82,7 @@ def main(argv: list[str]) -> int:
 
     threading.Thread(target=watchdog, daemon=True).start()
     try:
-        pipe.serve(system_setup.current_user_sid(), handler)
+        pipe.serve(system_setup.current_user_sid(), handler, should_stop=lambda: handler.stopping)
     except OSError as e:   # e.g. another program already owns the pipe name
         log.error("pipe failed: %s", e)
         return 1
