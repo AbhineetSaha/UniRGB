@@ -93,6 +93,12 @@ def main(argv=None) -> int:
         signal.signal(signal.SIGBREAK, lambda *_: stop.set())
     threading.Thread(target=srv.serve_forever, name="http", daemon=True).start()
     log.info("UI at %s", url)
+    tray = None
+    if sys.platform == "win32":
+        from .hostos.tray import Tray
+        tray = Tray(Path(__file__).parent / "ui" / "logo.ico", f"UniRGB {VERSION} is running",
+                    on_open=lambda: _open_window(url), on_quit=app.request_quit)
+        tray.start()
     if not args.no_window:
         _open_window(url)
     try:
@@ -101,6 +107,8 @@ def main(argv=None) -> int:
                 break
     finally:
         log.info("shutting down: releasing device sessions")
+        if tray:
+            tray.stop()
         srv.shutdown()
         app.shutdown()
     return 0
