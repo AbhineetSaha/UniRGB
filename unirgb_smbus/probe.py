@@ -1,10 +1,12 @@
-"""Read-only probe for ENE DRAM RGB controllers. Run as administrator:
+"""Probe for ENE DRAM RGB controllers (read-only unless you ask for more). Run as administrator:
 
-    python -m unirgb_smbus.probe [--identify] [--module PATH_TO_SmbusPIIX4.bin]
+    python -m unirgb_smbus.probe [--identify | --color-test ADDRESS] [--module PATH_TO_SmbusPIIX4.bin]
 
 Without --identify: sends only SMBus read transactions to 0x70-0x77 and prints what answered.
 With --identify: also reads each confirmed ENE controller's name and configuration table, which needs
-register-pointer writes (see ene.py). No lighting is changed either way.
+register-pointer writes (see ene.py). No lighting is changed by either.
+With --color-test 0x71: after you type YES, shows red on that one stick for 10 s, then hands it back to its
+stored effect (step 2). Nothing is saved to the stick. Rehearse it first in the Device Lab: python -m devlab
 """
 from __future__ import annotations
 
@@ -13,7 +15,7 @@ import ctypes
 import sys
 from pathlib import Path
 
-from .ene import EneReader
+from .ene import EneLighting, EneReader, color_test
 from .bus import AMD_VENDOR, ENE_DRAM_ADDRESSES, PIIX4_MODULE, PawnIO, ReadOnlySmbus, SmbusMutex
 
 # ENE controllers return their own register offset for 0xA0-0xAF (the identification OpenRGB uses).
@@ -33,7 +35,10 @@ def probe(bus: ReadOnlySmbus) -> list[dict]:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--module", type=Path, default=PIIX4_MODULE, help="PawnIO SmbusPIIX4.bin")
-    ap.add_argument("--identify", action="store_true", help="also read controller names and LED configuration")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--identify", action="store_true", help="also read controller names and LED configuration")
+    mode.add_argument("--color-test", type=lambda v: int(v, 16), metavar="ADDRESS",
+                      help="step 2 on one stick, e.g. 0x71: red for 10 s, then hand back")
     args = ap.parse_args(argv)
     if sys.platform != "win32" or not ctypes.windll.shell32.IsUserAnAdmin():
         print("Run this from an administrator terminal on Windows (PawnIO needs it).")
@@ -58,6 +63,8 @@ def main(argv: list[str] | None = None) -> int:
         found = probe(bus)
         confirmed = {f["address"] for f in found if f["ene"]}
         ids = [EneReader(pawn, lock, confirmed).identify(a) for a in sorted(confirmed)] if args.identify else []
+        if args.color_test is not None:
+            return _color_test(EneLighting(EneReader(pawn, lock, confirmed)), args.color_test, confirmed)
     finally:
         pawn.close()
 
@@ -75,6 +82,23 @@ def main(argv: list[str] | None = None) -> int:
         if i["config"] is not None:
             for row in range(0, len(i["config"]), 16):
                 print("  config +%02X: %s" % (row, " ".join(f"{b:02X}" for b in i["config"][row:row + 16])))
+    return 0
+
+
+def _color_test(lighting: EneLighting, addr: int, confirmed: set[int]) -> int:
+    if addr not in confirmed:
+        print(f"0x{addr:02X} did not answer as an ENE controller in this run; nothing written.")
+        return 1
+    info = lighting.verify(addr)
+    print(f"0x{addr:02X}: {info and info['name']}, LED count {info and info['led_count_candidates']}")
+    if input(f"Type YES to show red on 0x{addr:02X} for 10 seconds, then hand it back: ").strip() != "YES":
+        print("Cancelled; nothing written.")
+        return 0
+    print("Red for 10 seconds (Ctrl+C hands it back early)...")
+    try:
+        print(color_test(lighting, addr))
+    except KeyboardInterrupt:
+        print("Interrupted. UniRGB tried to switch direct mode off; check that the stick shows its usual effect.")
     return 0
 
 
