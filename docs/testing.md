@@ -42,6 +42,26 @@ UNIRGB_HW_WRITE=1 python -m unittest tests.test_hardware -v
 
 (In cmd, run `set UNIRGB_HW_WRITE=1` first.)
 
+## Device Lab
+
+A developer tool for rehearsing hardware code without the hardware. It is **not part of the app or the installer**:
+`tools/build-windows.cmd` excludes it, and `tests/test_devlab.py` fails if the app ever imports it.
+
+```bash
+python -m devlab
+```
+
+It opens `http://127.0.0.1:47850/` with virtual devices that answer UniRGB's real code byte for byte:
+
+- **Virtual LEDs** show what each device would display.
+- **Byte trace:** every transfer, decoded.
+- **Tripwires:** anything a real device must never receive stops the test in red. For RAM that means a transfer to an
+  SPD hub or power controller, the ENE save command, or a write to an undocumented register.
+- **Fault injection:** a busy bus, a device that stops answering.
+
+Currently virtual: ENE DRAM controllers (RAM). A pass proves UniRGB sends the documented bytes and handles faults. It
+does not prove a real device behaves the same, so a real-hardware test is still required before raising a support level.
+
 ## Reporting a hardware test
 
 A pull request that adds or changes a device, or raises a support level, should include:

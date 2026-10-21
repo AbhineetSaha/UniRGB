@@ -1,6 +1,8 @@
 """The Device Lab's virtual ENE sticks, driven by unirgb_smbus's real code."""
+import ast
 import unittest
 from contextlib import nullcontext
+from pathlib import Path
 
 from devlab.__main__ import Lab
 from devlab.virtual_smbus import Tripwire, VirtualEne, VirtualPiix4
@@ -79,6 +81,26 @@ class LabSafetyChecks(unittest.TestCase):
         stick.pointer = 0x8021   # mode register: no supported flow writes it
         with self.assertRaises(Tripwire):
             stick.xfer(0, 0x01, 2, [0x01])
+
+
+
+class DeveloperOnly(unittest.TestCase):
+    ROOT = Path(__file__).resolve().parents[1]
+
+    def test_the_app_never_imports_the_lab(self):
+        for p in [self.ROOT / "UniRGB.py", *(self.ROOT / "unirgb").rglob("*.py")]:
+            for node in ast.walk(ast.parse(p.read_text(encoding="utf-8"))):
+                if isinstance(node, ast.Import):
+                    names = [a.name for a in node.names]
+                elif isinstance(node, ast.ImportFrom):
+                    names = [node.module or ""]
+                else:
+                    continue
+                self.assertFalse(any(n.split(".")[0] == "devlab" for n in names), p.name)
+
+    def test_the_build_excludes_the_lab(self):
+        build = (self.ROOT / "tools" / "build-windows.cmd").read_text(encoding="utf-8")
+        self.assertIn("--exclude-module devlab", build)
 
 
 if __name__ == "__main__":

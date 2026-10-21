@@ -42,6 +42,10 @@ ruff check .
 See [docs/testing.md](docs/testing.md) for the opt-in real-hardware tests and what to report from a hardware test.
 Run the app with fake devices using `python -m unirgb --simulate`.
 
+**Device Lab** (developer tool, never shipped): `python -m devlab` opens virtual twins of supported devices driven by
+UniRGB's real code, with a byte trace, safety tripwires and fault injection. Rehearse any new write path there before
+it touches real hardware. See [docs/testing.md](docs/testing.md#device-lab).
+
 ## Pull requests
 
 Fork the repository, work on a branch, and open a pull request against `main`. `main` is protected: every change goes
