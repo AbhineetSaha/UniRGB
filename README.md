@@ -56,9 +56,9 @@ open the window, right-click for **Quit**. Quitting hands every device back to i
 python -m unirgb
 ```
 
-Python 3.11 or newer, no packages to install. The UI opens at `http://127.0.0.1:47821/` (in an Edge app window if
-available). Options: `--no-window`, `--simulate` (adds clearly labelled fake devices), `--no-direct` (vendor APIs
-only), `--port N`, `--verbose`. The one-time driver setup only works in the packaged app, not from source.
+Python 3.11 or newer, no packages to install (the window uses Tk, which ships with Python on Windows). Options:
+`--no-window` (start in the tray), `--simulate` (adds clearly labelled fake devices), `--no-direct` (vendor APIs only),
+`--verbose`. The one-time driver setup only works in the packaged app, not from source.
 
 ## Build the Windows installer
 

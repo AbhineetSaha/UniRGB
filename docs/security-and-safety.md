@@ -52,9 +52,10 @@ The app never runs elevated. Without the optional feature, nothing elevated is i
 
 ## Local attack surface
 
+UniRGB opens no network port. Its window runs in the same process as the app.
+
 | Surface | Risk | Mitigation |
 |---|---|---|
-| HTTP API on `127.0.0.1:47821` | Another local process or a web page drives your lighting | Loopback bind. Host allow-list blocks DNS rebinding. A per-run random token is required on every mutating request (web pages can't read it cross-origin). 256 KB body cap. CSP and `nosniff`. No CORS headers |
 | Hardware helper pipe | Another program asks the elevated helper to do something | Fixed request list, user-only ACL, no remote clients, read-only requests (see above) |
 | Scene import | Malformed JSON | Strict schema: version check, name pattern, color and brightness validation. An unreadable scenes file is never overwritten |
 | Razer Chroma server (not UniRGB's) | It accepts requests from any web page | Outside UniRGB's control; lighting changes are its only effect |

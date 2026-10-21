@@ -23,7 +23,6 @@ No code was copied from any project. Each protocol module names its sources in i
 | Razer Chroma SDK | proprietary | Optional fallback adapter, called over its local REST API if Synapse is installed | No (part of Synapse) |
 | AMD Ryzen Master SDK | proprietary, redistribution forbidden | Optional, only if you click "Use AMD Ryzen Master instead" on the pump display | No |
 | nvidia-smi | proprietary (part of the NVIDIA driver) | GPU temperature fallback, run as a separate process | No |
-| Microsoft Edge | proprietary (ships with Windows) | Optional window host (`--app`). Any browser works at `http://127.0.0.1:47821` | No |
 
 UniRGB's own code depends only on the Python standard library.
 

@@ -1,18 +1,18 @@
 # Architecture
 
-UniRGB is one unprivileged Python process (standard library only) that serves a single-page UI over loopback HTTP,
-plus an optional elevated hardware helper for the features that need a kernel driver.
+UniRGB is one unprivileged Python process (standard library only) with a native Tk window, plus an optional elevated
+hardware helper for the features that need a kernel driver. It opens no network port.
 
 ## Component diagram
 
 ```mermaid
 graph TD
   subgraph UI[Desktop UI]
-    PAGE[ui/index.html<br/>devices, controls, scenes, settings]
+    WIN[gui/window.py, gui/dialogs.py<br/>devices, controls, scenes, settings]
     TRAY[hostos/tray.py<br/>notification-area icon]
   end
   subgraph APPL[Application, unprivileged]
-    SRV[server.py<br/>loopback HTTP API, token + Host checks]
+    BR[gui.Bridge<br/>worker threads -> Tk thread]
     APP[app.py<br/>composition root, background rescan, restart]
     PREFS[prefs.py<br/>first-start choices]
     SETUP[system_setup.py<br/>one-time setup, status]
@@ -36,12 +36,12 @@ graph TD
     HELPER[hardware_helper.py<br/>ping, cpu_temp, ram_*, stop]
     PAWN[hostos/pawnio.py → PawnIO driver]
   end
-  PAGE -- fetch JSON --> SRV --> APP
+  WIN --> BR --> APP
   TRAY --> APP
-  SRV --> ORC --> REG
-  SRV --> SCN --> ORC
-  SRV --> PREFS
-  SRV --> SETUP
+  BR --> ORC --> REG
+  BR --> SCN --> ORC
+  WIN --> PREFS
+  WIN --> SETUP
   ORC --> DIRECT & COOL & VEND & INV
   DIRECT & COOL & INV --> HID
   COOL -- CPU temperature --> PIPE -- "\\.\pipe\UniRGB-hardware-helper" --> HELPER
@@ -51,7 +51,7 @@ graph TD
 ## Control paths
 
 ```
-Write:      UI ─POST /api/devices/{id}/apply→ server ─validate→ orchestrator ─queue(adapter)→
+Write:      window ─worker thread→ orchestrator.apply ─validate→ queue(adapter)→
             adapter ─HID feature/output report→ device ─ack / read-back→ registry.confirmed
 
 Discovery:  every 15 s (and on Rescan): HidCache.refresh() → each adapter.discover() on its own worker
@@ -74,7 +74,7 @@ CPU temp:   cooler feeder (1 s) → pipe request {"op": "cpu_temp"} → helper r
 | `PrefsStore` | First-start choices in `%APPDATA%\UniRGB\prefs.json`; known keys and booleans only | Elevation |
 | `system_setup` | The elevated one-time setup (`--system-setup`): installs PawnIO, copies the helper to `%ProgramFiles%\UniRGB Hardware Helper`, registers the task; status for the UI | Runs unless the user approved the UAC prompt |
 | `hardware_helper` | Fixed requests over a named pipe only the signed-in user can open; exits on `stop` or after 60 s idle | Takes arguments, loads modules from outside its own admin-only folder |
-| `server.py` | Loopback HTTP, per-run token for mutations, Host allow-list, body size cap, CSP | Business logic |
+| `gui/` | The native window and dialogs; runs device calls on worker threads and updates widgets only on the Tk thread | Talks to hardware directly |
 | `HidCache` | One HID enumeration per scan, shared by all adapters | Opens devices for I/O |
 
 ## Common device model (`core/models.py`)
@@ -88,13 +88,13 @@ CPU temp:   cooler feeder (1 s) → pipe request {"op": "cpu_temp"} → helper r
 
 ## Lifecycle
 
-* **Single instance:** fixed port 47821 with address reuse off, so a second launch cannot bind and opens the running
-  instance's window instead.
+* **Single instance:** a named mutex (`hostos/instance.py`). A second launch signals a named event and exits, and the
+  running instance shows its window.
 * **Background:** closing the window keeps UniRGB running; the tray icon shows it is running. The installer can add a
   sign-in entry (`--no-window`).
 * **Quit** (button or tray menu): every adapter's `shutdown()` hands its device back (keyboard returns to its stored
   lighting, pump display is blanked), then the hardware helper is told to stop.
-* **Restart** (`POST /api/restart`, used after the one-time setup): the app shuts down, frees its port and starts a
-  fresh copy without a new window. The open page reloads when it sees the new instance's token.
+* **Restart** (used after the one-time setup): the app shuts down, releases its single-instance mutex and starts a
+  fresh copy, which opens its window.
 * **Disconnect or sleep:** devices missing from a scan become `unavailable`, and a sleeping wireless mouse becomes
   `asleep`. Both keep their `desired` state, and it is re-applied when they return.
