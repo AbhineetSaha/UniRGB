@@ -6,6 +6,7 @@ a kernel driver on users' machines. Layout matches unirgb.system_setup.bundle_di
 import hashlib
 import io
 import shutil
+import sys
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -28,12 +29,13 @@ def fetch(url: str, sha256: str, urlopen=urllib.request.urlopen) -> bytes:
     return data
 
 
-def main() -> None:
+def main(extra: list[str] = ()) -> None:
+    """Stage the installer's PawnIO files. Extra module names are for development only (e.g. the RAM probe)."""
     shutil.rmtree(OUT, ignore_errors=True)   # never ship a module left over from an older pin
     (OUT / "modules").mkdir(parents=True)
     (OUT / "PawnIO_setup.exe").write_bytes(fetch(*SETUP))
     z = zipfile.ZipFile(io.BytesIO(fetch(*MODULES)))
-    for name in NEEDED_MODULES:
+    for name in (*NEEDED_MODULES, *extra):   # KeyError if a name isn't in the pinned release
         (OUT / "modules" / name).write_bytes(z.read(name))
     (OUT / "PawnIO.Modules-LGPL-2.1.txt").write_bytes(z.read("COPYING"))
     (OUT / "PawnIO-GPL-2.0.txt").write_bytes(fetch(*LICENSE))
@@ -41,4 +43,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])

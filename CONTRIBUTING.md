@@ -24,8 +24,10 @@ Thanks for helping. UniRGB talks to real hardware, so the rules below protect ot
   (`unirgb/hardware_helper.py`), which answers a fixed list of requests and takes no arguments that change what it
   does. New helper requests need a clear reason and a test.
 - **No SMBus or I²C writes, no embedded-controller, Super I/O or firmware-flashing code.** `tests/test_safety.py`
-  enforces the SMBus rule. RAM support is being designed separately, read-only first, with a fixed list of addresses
-  that may never be touched.
+  enforces the SMBus rule. The one exception is `unirgb_smbus/`, the RAM lighting work in progress. It can only reach
+  ENE DRAM controllers at 0x70–0x77, never SPD hubs (0x50–0x57) or power controllers (0x48–0x4F). Its only write is
+  the ENE register pointer, limited to the controller's name and configuration registers (`unirgb_smbus/ene.py`,
+  enforced by `tests/test_smbus.py`). Any lighting write needs its own reviewed pull request.
 - **No proprietary software or SDKs in the installer.** Bundled components must be open source, unmodified and
   hash-pinned (see `tools/fetch_pawnio.py`).
 - **No new dependencies.** The app uses the Python standard library only.
@@ -39,6 +41,10 @@ ruff check .
 
 See [docs/testing.md](docs/testing.md) for the opt-in real-hardware tests and what to report from a hardware test.
 Run the app with fake devices using `python -m unirgb --simulate`.
+
+**Device Lab** (developer tool, never shipped): `python -m devlab` opens virtual twins of supported devices driven by
+UniRGB's real code, with a byte trace, safety tripwires and fault injection. Rehearse any new write path there before
+it touches real hardware. See [docs/testing.md](docs/testing.md#device-lab).
 
 ## Pull requests
 
