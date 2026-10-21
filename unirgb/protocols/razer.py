@@ -23,6 +23,10 @@ class RazerProtocolError(Exception):
     pass
 
 
+class RazerAsleep(RazerProtocolError):
+    """The receiver answered "timeout": the wireless mouse is asleep, off or out of range."""
+
+
 def crc(report: bytes) -> int:
     c = 0
     for b in report[2:88]:
@@ -144,6 +148,8 @@ class RazerTransport:
             if resp["status"] == 0x01:
                 time.sleep(0.01)
                 continue
+            if resp["status"] == 0x04:
+                raise RazerAsleep("device answered timeout")
             raise RazerProtocolError(f"device answered {STATUS.get(resp['status'], resp['status'])}")
         raise RazerProtocolError(f"no matching response after {self.retries} tries (last status "
                                  f"{STATUS.get(last['status'], last['status']) if last else 'none'})")

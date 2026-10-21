@@ -43,6 +43,7 @@ class Confirmation(str, Enum):
 class Connection(str, Enum):
     CONNECTED = "connected"
     UNAVAILABLE = "unavailable"   # control path down (service stopped, server absent)
+    ASLEEP = "asleep"             # wireless device sleeping; it comes back when it wakes
     ERROR = "error"
     MONITOR_ONLY = "monitor-only"
 

@@ -44,7 +44,7 @@ aside{grid-area:side;border-right:1px solid var(--line);overflow:auto;padding:14
 .dot{width:8px;height:8px;border-radius:50%;flex:none}
 .dot.connected{background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 20%,transparent)}
 .dot.monitor-only{background:var(--info)}
-.dot.unavailable{background:var(--muted)}
+.dot.unavailable,.dot.asleep{background:var(--muted)}
 .dot.error{background:var(--bad)}
 .swatch-mini{width:12px;height:12px;border-radius:4px;border:1px solid var(--line);flex:none}
 main{grid-area:main;overflow:auto;padding:22px 26px}
@@ -274,7 +274,7 @@ async function loadDisplay(d){
     <div class="row"><label>Unit</label><div class="seg"><button data-unit="c" class="${st.fahrenheit?"":"on"}">°C</button><button data-unit="f" class="${st.fahrenheit?"on":""}">°F</button></div></div>
     <div class="row"><label>Above 84 °C</label><select id="dAb" class="hex" style="width:auto">${opt("cap84",st.anti_blink,"Hold at 84 (no flashing)")}${opt("compress",st.anti_blink,"Compress 75–100 into 75–84")}${opt("raw",st.anti_blink,"Raw (panel flashes at 85+)")}</select></div>
     ${st.confirmed ? "" : `<div class="banner">UniRGB has not sent anything to this USB device yet. Its chip (5131:2007) is also used by relay boards and other gadgets. <button class="btn primary" id="dConfirm" style="margin-left:8px">Yes, this is my cooler display</button></div>`}
-    <div class="row"><label>CPU source</label>${own ? `<span class="chip ok">UniRGB hardware helper</span>` : s.lhm.running ? `<span class="chip ok">LibreHardwareMonitor connected</span>` : `<span class="chip warn">LibreHardwareMonitor not running</span> <span class="muted" style="font-size:12px">Open source: enable Options → Remote Web Server (port 8085)</span>`}</div>
+    <div class="row"><label>CPU source</label>${own ? `<span class="chip ok">UniRGB hardware helper</span>` : S.prefs.cpu_temperature ? `<span class="chip warn">UniRGB hardware helper not answering</span> <button class="btn" id="dSetup">Open Settings</button>` : s.lhm.running ? `<span class="chip ok">LibreHardwareMonitor connected</span>` : `<span class="chip warn">LibreHardwareMonitor not running</span> <span class="muted" style="font-size:12px">Open source: enable Options → Remote Web Server (port 8085)</span>`}</div>
     ${s.lhm.fans.length ? `<div class="row" style="align-items:flex-start"><label>Fans</label><div>${s.lhm.fans.map(f => `<div>${esc(f.name)}: <b>${f.rpm}</b> RPM</div>`).join("")}<div class="muted" style="font-size:12px">Read-only, from LibreHardwareMonitor</div></div></div>` : ""}
     <div class="row" style="margin-top:14px;gap:8px">
       ${own || s.lhm.running ? "" : s.cpu_helper.running ? `<span class="chip ok">AMD Ryzen Master helper running</span>` :
@@ -286,6 +286,7 @@ async function loadDisplay(d){
   $("#dSrc").onchange = e => send({source: e.target.value});
   $("#dAb").onchange = e => send({anti_blink: e.target.value});
   document.querySelectorAll("[data-unit]").forEach(b => b.onclick = () => send({fahrenheit: b.dataset.unit === "f"}));
+  $("#dSetup")?.addEventListener("click", () => openSetup(false));
   $("#dHelper")?.addEventListener("click", async () => { const r2 = await api("POST", devPath(d.info.id) + "/cpu-helper"); toast(r2.message, r2._ok ? "ok" : "bad"); setTimeout(() => loadDisplay(d), 4000); });
 }
 
@@ -375,7 +376,7 @@ function infoCard(d){
 function renderMain(){
   const d = S.devices.find(x => x.info.id === sel);
   if (!d){ $("#main").innerHTML = `<div class="empty">No devices found.</div>`; return; }
-  const connChip = {connected:["ok","Connected"],"monitor-only":["info","Monitor only"],unavailable:["","Unavailable"],error:["bad","Error"]}[d.connection];
+  const connChip = {connected:["ok","Connected"],"monitor-only":["info","Monitor only"],unavailable:["","Unavailable"],asleep:["info","Asleep"],error:["bad","Error"]}[d.connection];
   const sim = d.info.adapter === "sim";
   $("#main").innerHTML = `
     ${sim ? `<div class="banner"><b>Simulated device.</b> Nothing here touches real hardware.</div>` : ""}

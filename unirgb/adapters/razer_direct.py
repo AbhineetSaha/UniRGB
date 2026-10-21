@@ -84,10 +84,14 @@ class RazerDirectAdapter(DeviceAdapter):
             try:
                 fw = self._transport_for(dev_id).transact(rz.get_firmware())
                 evidence.append(f"firmware v{fw['args'][0]}.{fw['args'][1]} read over HID (device answered)")
+            except rz.RazerAsleep:
+                conn = Connection.ASLEEP
+                notes.append("The mouse is asleep (it turns itself off after its sleep timer). Move it: UniRGB "
+                             "reconnects and puts your lighting back within about 15 seconds.")
             except Exception as e:
                 conn = Connection.UNAVAILABLE
-                notes.append(f"The receiver answered, but the mouse did not ({e}). It is probably asleep or "
-                             "switched off. Move it and press Rescan.")
+                notes.append(f"The receiver is there, but the mouse did not answer properly ({e}). If Razer Synapse "
+                             "is running it may be talking to the mouse at the same time. Press Rescan.")
             if synapse:
                 notes.append("Razer Synapse is running and talks to the same interface. It can re-apply its own "
                              "lighting over UniRGB's. For exclusive control, quit Synapse.")

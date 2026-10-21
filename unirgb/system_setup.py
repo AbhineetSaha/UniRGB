@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-from .hostos import windows_system
+from .hostos import pawnio, windows_system
 
 TASK_NAME = "UniRGB Hardware Helper"
 HELPER_ARG = "--hardware-helper"
@@ -66,20 +66,32 @@ def _run(cmd: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, creationflags=_NOWIN, timeout=300)
 
 
-def enable(user_sid: str, src_exe: Path, run=_run, service_state=windows_system.service_state,
-           dst: Path | None = None) -> list[str]:
+def driver_state(service_state=windows_system.service_state, dll: Path = pawnio.PAWNIO_DLL) -> str:
+    """The PawnIO service state, or "not-installed" if its library is gone: uninstalling PawnIO can leave
+    the service entry behind, and the helper cannot load the driver without PawnIOLib.dll."""
+    state = service_state("PawnIO")
+    return state if dll.is_file() else "not-installed"
+
+
+def enable(user_sid: str, src_exe: Path, run=_run, driver=driver_state, dst: Path | None = None) -> list[str]:
     steps = []
     bundle, dst = bundle_dir(src_exe), dst or helper_dir()
-    if service_state("PawnIO") == "not-installed":
+    state = driver()
+    if state == "not-installed":
         setup = bundle / "PawnIO_setup.exe"
         if not setup.is_file():
             raise FileNotFoundError(f"PawnIO installer missing: {setup}")
         rc = run([str(setup), "-install", "-silent"]).returncode
         if rc not in PAWNIO_OK:
             raise RuntimeError(f"PawnIO installer failed with code {rc}")
-        if service_state("PawnIO") == "not-installed":
+        if driver() == "not-installed":
             raise RuntimeError("PawnIO installer finished but the driver is not registered")
         steps.append("installed PawnIO" + (" (restart Windows to finish)" if rc == 3010 else ""))
+    elif state != "running":
+        run(["sc", "start", "PawnIO"])
+        if driver() != "running":
+            raise RuntimeError(f"PawnIO is installed but its driver will not start ({state}); restart Windows and try again")
+        steps.append("started the PawnIO driver")
     else:
         steps.append("PawnIO already installed")
 
@@ -113,7 +125,7 @@ def disable(run=_run, dst: Path | None = None) -> list[str]:
     return ["removed the scheduled task and the helper files"]
 
 
-def status(exe: Path, run=_run, dst: Path | None = None) -> dict:
+def status(exe: Path, run=_run, dst: Path | None = None, driver=driver_state) -> dict:
     """Unprivileged view for the UI: is the one-time setup in place and current?"""
     dst = dst or helper_dir()
     copy = dst / "UniRGB.exe"
@@ -126,8 +138,9 @@ def status(exe: Path, run=_run, dst: Path | None = None) -> dict:
         result = json.loads((dst / "setup-result.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         result = None
-    return {"task": task, "helper": copy.is_file(), "stale": stale, "ready": task and copy.is_file() and not stale,
-            "last_result": result}
+    drv = driver()
+    return {"task": task, "helper": copy.is_file(), "stale": stale, "driver": drv,
+            "ready": task and copy.is_file() and not stale and drv != "not-installed", "last_result": result}
 
 
 def current_user_sid() -> str:

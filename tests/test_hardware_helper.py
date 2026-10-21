@@ -49,13 +49,16 @@ class ClientTests(unittest.TestCase):
     def test_app_starts_helper_only_when_enabled_and_backs_off(self):
         with tempfile.TemporaryDirectory() as tmp:
             app = App(adapters=[SimulatedAdapter()], hid_cache=HidCache(lambda: []), scenes_path=Path(tmp) / "s.json")
-            with mock.patch("unirgb.system_setup.start_helper") as start:
+            with mock.patch("unirgb.system_setup.start_helper") as start,                     mock.patch("unirgb.system_setup.driver_state", return_value="running") as drv:
                 app._start_helper()
                 start.assert_not_called()
                 app.prefs.update({"cpu_temperature": True})
                 app._start_helper()
                 app._start_helper()
                 self.assertEqual(start.call_count, 1, "second call within 30 s is skipped")
+                drv.return_value, app._helper_started = "not-installed", float("-inf")
+                app._start_helper()
+                self.assertEqual(start.call_count, 1, "no driver: the helper would only fail")
             app.shutdown()
 
 

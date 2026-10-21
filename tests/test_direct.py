@@ -70,9 +70,13 @@ class RazerDirectTests(unittest.TestCase):
         self.assertEqual(d.connection, Connection.CONNECTED)
         self.assertIn("firmware v2.50", " ".join(d.info.evidence))
 
-    def test_asleep_is_unavailable(self):
-        a, [d] = self.make(FakeRazerDev(asleep=True))
-        self.assertEqual(d.connection, Connection.UNAVAILABLE)
+    def test_asleep_is_reported_as_asleep_and_wakes_up(self):
+        dev = FakeRazerDev(asleep=True)
+        a, [d] = self.make(dev)
+        self.assertEqual(d.connection, Connection.ASLEEP)
+        dev.asleep = False   # the user moved the mouse; the next rescan finds it
+        [d] = a.discover()
+        self.assertEqual(d.connection, Connection.CONNECTED)
 
     def test_static_uses_nostore_and_reads_back(self):
         dev = FakeRazerDev()

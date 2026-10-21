@@ -88,7 +88,8 @@ class App:
         now = time.monotonic()
         if self.prefs.prefs.cpu_temperature and now - self._helper_started > 30:
             self._helper_started = now
-            system_setup.start_helper()
+            if system_setup.driver_state() != "not-installed":   # without it the helper only fails; Settings offers setup
+                system_setup.start_helper()
 
     def rescan(self, full: bool = False) -> None:
         with self._scan_lock:

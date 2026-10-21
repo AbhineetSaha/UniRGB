@@ -20,7 +20,6 @@ from urllib.parse import unquote, urlparse
 
 from .core.models import LightingState
 from . import system_setup
-from .hostos import windows_system
 
 log = logging.getLogger("unirgb.server")
 UI_FILE = Path(__file__).parent / "ui" / "index.html"
@@ -112,7 +111,7 @@ def make_server(app, host: str = "127.0.0.1", port: int = 0) -> ThreadingHTTPSer
         }
 
     def prefs_payload():
-        return {**app.prefs.to_dict(), "driver": windows_system.service_state("PawnIO")}
+        return {**app.prefs.to_dict(), "driver": system_setup.driver_state()}
 
     def route(method, parts, h):
         if method == "GET" and parts == ["favicon.ico"]:
