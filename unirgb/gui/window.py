@@ -1,6 +1,7 @@
 """The main window: device list on the left, the selected device's page on the right."""
 from __future__ import annotations
 
+import colorsys
 import re
 import time
 import tkinter as tk
@@ -9,7 +10,8 @@ from tkinter import colorchooser, ttk
 from ..core.models import Color, LightingState
 from . import theme as T
 
-PRESETS = ["#ff3b30", "#ff9500", "#ffd60a", "#34c759", "#00c7be", "#0a84ff", "#5e5ce6", "#bf5af2", "#ffffff", "#000000"]
+PRESETS = ["#ff3b30", "#ff9500", "#ffcc00", "#a3e635", "#34c759", "#00c7be", "#32ade6", "#0a84ff", "#5e5ce6",
+           "#bf5af2", "#ff2d92", "#ffffff"]
 WRITABLE_LEVELS = ("supported", "experimental", "untested")
 HEX = re.compile(r"^#?[0-9a-fA-F]{6}$")
 
@@ -35,15 +37,22 @@ class ScrollFrame(ttk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
         self.canvas = tk.Canvas(self, bg=T.BG, highlightthickness=0, borderwidth=0)
-        bar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.bar = bar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
         self.inner = ttk.Frame(self.canvas)
         self._win = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
-        self.canvas.configure(yscrollcommand=bar.set)
+        self.canvas.configure(yscrollcommand=self._scrolled)
+        bar.pack(side="right", fill="y", padx=T.S(4), pady=T.S(4))
         self.canvas.pack(side="left", fill="both", expand=True)
-        bar.pack(side="right", fill="y")
         self.inner.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfigure(self._win, width=e.width))
         self.canvas.bind_all("<MouseWheel>", self._wheel, add="+")
+
+    def _scrolled(self, first, last):
+        self.bar.set(first, last)
+        if float(first) <= 0 and float(last) >= 1:
+            self.bar.pack_forget()
+        elif not self.bar.winfo_ismapped():
+            self.bar.pack(side="right", fill="y", padx=T.S(4), pady=T.S(4), before=self.canvas)
 
     def _wheel(self, e):
         w = e.widget
@@ -60,27 +69,68 @@ class ScrollFrame(ttk.Frame):
 
 
 def card(parent, title: str) -> ttk.Frame:
-    outer = tk.Frame(parent, bg=T.PANEL, highlightbackground=T.LINE, highlightthickness=1)
-    ttk.Label(outer, text=title.upper(), style="CardTitle.TLabel").pack(anchor="w", padx=14, pady=(12, 6))
+    outer = ttk.Frame(parent, style="Card.TFrame", padding=(T.S(22), T.S(18), T.S(22), T.S(22)))
+    ttk.Label(outer, text=title, style="CardTitle.TLabel").pack(anchor="w", pady=(0, T.S(12)))
     body = ttk.Frame(outer, style="Panel.TFrame")
-    body.pack(fill="both", expand=True, padx=14, pady=(0, 14))
+    body.pack(fill="both", expand=True)
     outer.body = body
     return outer
 
 
 def row(body, label: str) -> ttk.Frame:
     f = ttk.Frame(body, style="Panel.TFrame")
-    f.pack(fill="x", pady=3)
-    ttk.Label(f, text=label, style="Panel.TLabel", width=13, foreground=T.MUTED).pack(side="left")
+    f.pack(fill="x", pady=T.S(4))
+    ttk.Label(f, text=label, style="Field.TLabel", width=13).pack(side="left")
     return f
 
 
-def swatch(parent, color: str, size: int = 22, command=None, bg=T.PANEL) -> tk.Frame:
-    f = tk.Frame(parent, width=size, height=size, bg=color, highlightbackground=T.LINE, highlightthickness=1,
-                 cursor="hand2" if command else "")
-    if command:
-        f.bind("<Button-1>", lambda e: command())
-    return f
+class Swatch(tk.Label):
+    """A rounded color tile (or circle); clickable when given a command. .color holds the color shown."""
+
+    def __init__(self, parent, color: str, size: int = 22, command=None, bg=None, circle=False):
+        super().__init__(parent, bd=0, highlightthickness=0, bg=bg or T.PANEL, cursor="hand2" if command else "")
+        self.size, self.circle, self.selected, self._hover = size, circle, False, False
+        self.set(color)
+        if command:
+            self.bind("<Button-1>", lambda e: command())
+            self.bind("<Enter>", lambda e: self._hovered(True))
+            self.bind("<Leave>", lambda e: self._hovered(False))
+
+    def set(self, color: str, selected: bool | None = None) -> None:
+        self.color = color
+        self.selected = self.selected if selected is None else selected
+        self.configure(image=T.swatch_image(color, self.size, self.circle, self._hover, self.selected, self.cget("bg")))
+
+    def _hovered(self, on: bool) -> None:
+        self._hover = on
+        self.set(self.color)
+
+
+class HueBar(tk.Canvas):
+    """A rainbow strip with a draggable knob: picks a fully saturated color."""
+
+    def __init__(self, parent, color: str, on_pick, width: int = 260):
+        k = T.S(20)
+        self.w, self.pad, self.on_pick = T.S(width), k // 2, on_pick
+        super().__init__(parent, width=self.w + k, height=k, bg=T.PANEL, highlightthickness=0, cursor="hand2")
+        self.create_image(self.pad, k // 2, image=T.hue_bar(self.w, T.S(10)), anchor="w")
+        self.knob = self.create_image(self.pad, k // 2)
+        for ev in ("<Button-1>", "<B1-Motion>"):
+            self.bind(ev, lambda e: self._at(e.x))
+        self.set(color)
+
+    def set(self, color: str) -> None:
+        h = colorsys.rgb_to_hsv(*(int(color[i:i + 2], 16) / 255 for i in (1, 3, 5)))[0]
+        self.coords(self.knob, self.pad + h * (self.w - 1), self.pad)
+        self.itemconfigure(self.knob, image=T.dot(color, 20, "#ffffff"))
+
+    def _at(self, x: int) -> None:
+        t = max(0.0, min(1.0, (x - self.pad) / (self.w - 1)))
+        self.on_pick("#" + "".join(f"{round(c * 255):02x}" for c in colorsys.hsv_to_rgb(t, 1, 1)))
+
+
+def chip(parent, text: str, color: str, bg=None) -> ttk.Label:
+    return ttk.Label(parent, text=text, style=T.chip_style(color, bg))
 
 
 class MainWindow:
@@ -91,53 +141,59 @@ class MainWindow:
         self.drafts: dict[str, dict] = {}
         self.live = tk.BooleanVar(value=True)
         self.show_dupes = tk.BooleanVar(value=False)
-        self._images: dict[str, tk.PhotoImage] = {}
         self._sig = None
         self._inflight, self._queued, self._send_after = False, False, None
         self._status_after = None
         self._state_box = None
         self._display_box = None
+        self._avatar = None
 
         root.title("UniRGB")
-        root.geometry("1180x780")
-        root.minsize(900, 560)
+        root.geometry("1220x800")
+        root.minsize(940, 580)
         T.apply(root)
+        S = T.S
 
-        head = ttk.Frame(root, padding=(16, 10))
-        head.pack(fill="x")
-        ttk.Label(head, text="UniRGB", font=("Segoe UI Semibold", 14)).pack(side="left")
-        ttk.Label(head, text=f"v{version}", style="MutedBg.TLabel").pack(side="left", padx=(6, 0), pady=(4, 0))
-        for text, cmd, style in (("Quit", on_quit, "Danger.TButton"), ("Rescan", self.rescan, "TButton"),
-                                 ("Diagnostics", open_diagnostics, "TButton"), ("Settings", lambda: open_settings(False), "TButton"),
-                                 ("Scenes", open_scenes, "TButton")):
-            ttk.Button(head, text=text, command=cmd, style=style).pack(side="right", padx=(6, 0))
-        ttk.Button(head, text="Sync all", command=self.sync_all).pack(side="right", padx=(12, 0))
-        self.sync_color = "#7c6cff"
-        self._sync_sw = swatch(head, self.sync_color, 26, self._pick_sync, bg=T.BG)
-        self._sync_sw.pack(side="right")
-        ttk.Label(head, text="All controllable", style="MutedBg.TLabel").pack(side="right", padx=(0, 8))
-
-        body = ttk.Frame(root)
-        body.pack(fill="both", expand=True)
-        side = ttk.Frame(body, width=290)
-        side.pack(side="left", fill="y", padx=(12, 0))
+        # left: brand, device list, adapter health; right: toolbar and the device page
+        side = ttk.Frame(root, style="Side.TFrame", width=S(280), padding=(S(12), S(16), S(12), S(12)))
+        side.pack(side="left", fill="y")
         side.pack_propagate(False)
+        brand = ttk.Frame(side, style="Side.TFrame", padding=(S(8), 0, 0, S(16)))
+        brand.pack(fill="x")
+        self._logo = T.logo(32)
+        if self._logo:
+            ttk.Label(brand, image=self._logo, style="Side.TLabel").pack(side="left", padx=(0, S(10)))
+        ttk.Label(brand, text="UniRGB", style="Side.TLabel", font=T.SUBTITLE).pack(side="left")
+        ttk.Label(brand, text=f"v{version}", style="MutedSide.TLabel").pack(side="left", padx=(S(6), 0), pady=(S(5), 0))
+        self.health = ttk.Frame(side, style="Side.TFrame", padding=(S(8), S(8), 0, 0))
+        self.health.pack(side="bottom", fill="x")
+        ttk.Checkbutton(side, text="Show duplicate entries", variable=self.show_dupes, style="Side.TCheckbutton",
+                        command=self.refresh).pack(side="bottom", anchor="w", padx=S(8), pady=(S(6), 0))
         self.tree = ttk.Treeview(side, show="tree", selectmode="browse")
         self.tree.pack(fill="both", expand=True)
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
-        self.tree.tag_configure("group", foreground=T.MUTED, font=T.CARD_TITLE)
+        self.tree.tag_configure("group", foreground=T.MUTED, font=(T.SMALL[0], 8, "bold"))
         self.tree.tag_configure("dupe", foreground=T.MUTED)
-        ttk.Checkbutton(side, text="Show duplicate entries", variable=self.show_dupes, style="TCheckbutton",
-                        command=self.refresh).pack(anchor="w", pady=6)
-        self.detail = ScrollFrame(body)
-        self.detail.pack(side="left", fill="both", expand=True, padx=12)
 
-        foot = ttk.Frame(root, padding=(16, 6))
-        foot.pack(fill="x")
-        self.health = ttk.Frame(foot)
-        self.health.pack(side="left")
-        self.status = ttk.Label(foot, text="", style="MutedBg.TLabel")
-        self.status.pack(side="right")
+        main = ttk.Frame(root)
+        main.pack(side="left", fill="both", expand=True)
+        head = ttk.Frame(main, padding=(S(20), S(12), S(16), S(4)))
+        head.pack(fill="x")
+        for text, cmd, style in (("Quit", on_quit, "Bad.Ghost.TButton"), ("Rescan", self.rescan, "Ghost.TButton"),
+                                 ("Diagnostics", open_diagnostics, "Ghost.TButton"),
+                                 ("Settings", lambda: open_settings(False), "Ghost.TButton"),
+                                 ("Scenes", open_scenes, "Ghost.TButton")):
+            ttk.Button(head, text=text, command=cmd, style=style).pack(side="right", padx=(S(2), 0))
+        ttk.Frame(head, width=1, style="Side.TFrame").pack(side="right", fill="y", padx=S(10), pady=S(4))
+        ttk.Button(head, text="Sync all", command=self.sync_all, style="Bg.Primary.TButton").pack(side="right")
+        self.sync_color = "#7c6cff"
+        self._sync_sw = Swatch(head, self.sync_color, 30, self._pick_sync, bg=T.BG)
+        self._sync_sw.pack(side="right", padx=(0, S(10)))
+        ttk.Label(head, text="All devices", style="MutedBg.TLabel").pack(side="right", padx=(0, S(10)))
+        self.status = ttk.Label(head, text="", style="MutedBg.TLabel")
+        self.status.pack(side="left")
+        self.detail = ScrollFrame(main)
+        self.detail.pack(fill="both", expand=True, padx=(S(20), 0))
 
         self.refresh()
         root.after(2000, self._tick)
@@ -145,17 +201,10 @@ class MainWindow:
     # ---------- helpers ----------
     def toast(self, msg: str, kind: str = "info") -> None:
         color = {"ok": T.OK, "bad": T.BAD, "info": T.MUTED}[kind]
-        self.status.configure(text=msg, foreground=color)
+        self.status.configure(text=f" {msg}", foreground=color, image=T.dot(color, 8), compound="left")
         if self._status_after:
             self.root.after_cancel(self._status_after)
-        self._status_after = self.root.after(8000 if kind == "bad" else 4000, lambda: self.status.configure(text=""))
-
-    def _img(self, color: str, size: int = 14) -> tk.PhotoImage:
-        if color not in self._images:
-            img = tk.PhotoImage(width=size, height=size)
-            img.put(color, to=(0, 0, size, size))
-            self._images[color] = img
-        return self._images[color]
+        self._status_after = self.root.after(8000 if kind == "bad" else 4000, lambda: self.status.configure(text="", image=""))
 
     def records(self):
         return self.app.orch.registry.snapshot()
@@ -184,8 +233,11 @@ class MainWindow:
         if sig != self._sig:
             self._sig = sig
             self.render_detail()
-        elif rec and self._state_box is not None and self._state_box.winfo_exists():
-            self._fill_state(self._state_box, rec)
+        elif rec:
+            if self._state_box is not None and self._state_box.winfo_exists():
+                self._fill_state(self._state_box, rec)
+            if self._avatar is not None and self._avatar.winfo_exists():
+                self._avatar.set(current_color(rec) or T.PANEL2)
 
     def _fill_tree(self, recs):
         self.tree.delete(*self.tree.get_children())
@@ -197,10 +249,12 @@ class MainWindow:
             if not items:
                 continue
             gid = f"grp:{g}"
-            self.tree.insert("", "end", iid=gid, text=f"{g.upper()}   {len(items)}", open=True, tags=("group",))
+            self.tree.insert("", "end", iid=gid, text=f"{g.upper()}  ·  {len(items)}", open=True, tags=("group",))
             for r in items:
-                color = current_color(r) or T.CONNECTION[r.connection.value][1]
-                self.tree.insert(gid, "end", iid=r.info.id, text=f"  {r.info.name}", image=self._img(color),
+                label, status = T.CONNECTION[r.connection.value]
+                note = "" if r.connection.value == "connected" else f"   ·  {label}"
+                self.tree.insert(gid, "end", iid=r.info.id, text=f"   {r.info.name}{note}",
+                                 image=T.device_icon(current_color(r) or T.PANEL2, status),
                                  tags=("dupe",) if r.shadowed_by else ())
         if self.sel and self.tree.exists(self.sel):
             self.tree.selection_set(self.sel)
@@ -208,12 +262,16 @@ class MainWindow:
     def _fill_health(self):
         for w in self.health.winfo_children():
             w.destroy()
-        for name, h in self.app.orch.health().items():
-            ttk.Label(self.health, text=f"● {name}", style="MutedBg.TLabel",
-                      foreground=T.OK if h.available else T.MUTED).pack(side="left", padx=(0, 10))
+        line = None
+        for i, (name, h) in enumerate(self.app.orch.health().items()):
+            if i % 3 == 0:
+                line = ttk.Frame(self.health, style="Side.TFrame")
+                line.pack(anchor="w")
+            ttk.Label(line, text=f" {name}", image=T.dot(T.OK if h.available else T.MUTED, 7), compound="left",
+                      style="MutedSide.TLabel").pack(side="left", padx=(0, T.S(10)))
         t = time.strftime("%H:%M:%S", time.localtime(self.app.last_scan)) if self.app.last_scan else "—"
-        ttk.Label(self.health, text=f"last scan {t} ({round(self.app.last_scan_ms)} ms)",
-                  style="MutedBg.TLabel").pack(side="left", padx=(10, 0))
+        ttk.Label(self.health, text=f"Last scan {t}  ·  {round(self.app.last_scan_ms)} ms",
+                  style="MutedSide.TLabel").pack(anchor="w", pady=(T.S(4), 0))
 
     def _on_select(self, _e=None):
         s = self.tree.selection()
@@ -232,25 +290,26 @@ class MainWindow:
             ttk.Label(page, text="No devices found.", style="MutedBg.TLabel").pack(pady=40)
             return
         if rec.info.adapter == "sim":
-            self._banner(page, "Simulated device. Nothing here touches real hardware.")
+            self._banner(page, "Simulated device. Nothing here touches real hardware.", info=True)
         head = ttk.Frame(page)
-        head.pack(fill="x", pady=(8, 10))
-        ttk.Label(head, text=rec.info.name, font=T.TITLE).pack(anchor="w")
+        head.pack(fill="x", pady=(T.S(10), T.S(16)))
+        self._avatar = Swatch(head, current_color(rec) or T.PANEL2, 56, bg=T.BG)
+        self._avatar.pack(side="left", padx=(0, T.S(16)))
+        ttk.Label(head, text=rec.info.name, style="Title.TLabel").pack(anchor="w")
         chips = ttk.Frame(head)
-        chips.pack(anchor="w", pady=(4, 0))
+        chips.pack(anchor="w", pady=(T.S(6), 0))
         label, color = T.CONNECTION[rec.connection.value]
-        bits = [(label, color)] + [(t, T.MUTED) for t in (rec.info.vendor, rec.info.vidpid, rec.info.category.value,
-                                                          f"adapter: {rec.info.adapter}") if t]
+        bits = [("●  " + label, color)] + [(t, T.MUTED) for t in (rec.info.vendor, rec.info.vidpid,
+                                                                   rec.info.category.value, rec.info.adapter) if t]
         if rec.caps.color.value in ("experimental", "untested"):
             bits.append((f"{rec.caps.color.value} control", T.WARN))
         if rec.shadowed_by:
             bits.append((f"duplicate of {rec.shadowed_by}", T.WARN))
         for text, c in bits:
-            tk.Label(chips, text=text, bg=T.BG, fg=c, font=T.SMALL, highlightbackground=T.LINE, highlightthickness=1,
-                     padx=8, pady=1).pack(side="left", padx=(0, 6))
+            chip(chips, text, c).pack(side="left", padx=(0, T.S(6)))
         if any("controlling the lighting" in c for c in rec.info.controlled_by):
             b = self._banner(page, "Razer Synapse is controlling this mouse's lighting, so UniRGB cannot reach it.")
-            ttk.Button(b, text="Quit Razer Synapse", style="Primary.TButton",
+            ttk.Button(b, text="Quit Razer Synapse", style="Banner.Primary.TButton",
                        command=lambda: self._quit_synapse(rec.info.id)).pack(side="right")
 
         grid = ttk.Frame(page)
@@ -265,13 +324,14 @@ class MainWindow:
             cards.append(c)
         cards += [self._caps_card(grid, rec), self._info_card(grid, rec)]
         for i, c in enumerate(cards):
-            c.grid(row=i // 2, column=i % 2, sticky="nsew", padx=(0, 12), pady=(0, 12))
+            c.grid(row=i // 2, column=i % 2, sticky="nsew", padx=(0, T.S(16)), pady=(0, T.S(16)))
         grid.columnconfigure((0, 1), weight=1, uniform="col")
 
-    def _banner(self, parent, text) -> tk.Frame:
-        b = tk.Frame(parent, bg="#2a2416", highlightbackground="#5c4a1e", highlightthickness=1)
-        b.pack(fill="x", pady=(8, 0))
-        tk.Label(b, text=text, bg="#2a2416", fg=T.TEXT, wraplength=620, justify="left").pack(side="left", padx=12, pady=8)
+    def _banner(self, parent, text, on_panel=False, info=False) -> ttk.Frame:
+        kind = "Info" if info else "Banner"
+        b = ttk.Frame(parent, style=("Panel." if on_panel else "") + f"{kind}.TFrame", padding=(T.S(16), T.S(10)))
+        b.pack(fill="x", pady=(T.S(8), T.S(4)))
+        ttk.Label(b, text=text, style=f"{kind}.TLabel", wraplength=560, justify="left").pack(side="left", pady=T.S(2))
         return b
 
     # --- lighting ---
@@ -303,20 +363,26 @@ class MainWindow:
             r = row(b, "Mode")
             mode = tk.StringVar(value=d["mode"])
             for e in caps.effects:
-                ttk.Radiobutton(r, text=e.capitalize(), value=e, variable=mode,
+                ttk.Radiobutton(r, text=e.capitalize(), value=e, variable=mode, style="Segment.TRadiobutton",
                                 command=lambda: (d.__setitem__("mode", mode.get()), self._schedule(rec, now=True))
-                                ).pack(side="left", padx=(0, 10))
+                                ).pack(side="left", padx=(0, T.S(4)))
         r = row(b, "Color")
-        self._color_sw = swatch(r, d["color"], 28, lambda: self._pick(rec))
+        self._color_sw = Swatch(r, d["color"], 32, lambda: self._pick(rec))
         self._color_sw.pack(side="left")
         self._hex = tk.StringVar(value=d["color"])
         e = ttk.Entry(r, textvariable=self._hex, width=9, font=T.MONO)
-        e.pack(side="left", padx=8)
+        e.pack(side="left", padx=T.S(10))
         e.bind("<Return>", lambda _e: self._hex_entered(rec))
         e.bind("<FocusOut>", lambda _e: self._hex_entered(rec))
         r = row(b, "")
+        self._presets = []
         for p in PRESETS:
-            swatch(r, p, 18, lambda p=p: self._set_color(rec, p)).pack(side="left", padx=(0, 4))
+            sw = Swatch(r, p, 22, lambda p=p: self._set_color(rec, p), circle=True)
+            sw.set(p, selected=p == d["color"])
+            sw.pack(side="left", padx=(0, T.S(3)))
+            self._presets.append(sw)
+        self._hue = HueBar(row(b, "Hue"), d["color"], lambda c: self._set_color(rec, c))
+        self._hue.pack(side="left")
         if caps.brightness.value in WRITABLE_LEVELS:
             r = row(b, "Brightness")
             val = ttk.Label(r, text=f"{d['brightness']}%", style="Panel.TLabel", width=5)
@@ -335,19 +401,19 @@ class MainWindow:
                 zr = ttk.Frame(b, style="Panel.TFrame")
                 zr.pack(fill="x", pady=2)
                 on = tk.BooleanVar(value=z.id in d["zones"])
-                zsw = swatch(zr, d["zones"].get(z.id, d["color"]), 18)
+                zsw = Swatch(zr, d["zones"].get(z.id, d["color"]), 20)
 
                 def toggle(z=z, on=on, zsw=zsw):
                     if on.get():
-                        d["zones"][z.id] = zsw.cget("bg")
+                        d["zones"][z.id] = zsw.color
                     else:
                         d["zones"].pop(z.id, None)
                     self._schedule(rec)
 
                 def pick_zone(z=z, on=on, zsw=zsw):
-                    got = colorchooser.askcolor(color=zsw.cget("bg"), parent=self.root, title=z.name)[1]
+                    got = colorchooser.askcolor(color=zsw.color, parent=self.root, title=z.name)[1]
                     if got:
-                        zsw.configure(bg=got)
+                        zsw.set(got)
                         on.set(True)
                         d["zones"][z.id] = got
                         self._schedule(rec)
@@ -357,13 +423,13 @@ class MainWindow:
                 zsw.bind("<Button-1>", lambda e, f=pick_zone: f())
                 zsw.pack(side="right")
         r = ttk.Frame(b, style="Panel.TFrame")
-        r.pack(fill="x", pady=(14, 0))
-        ttk.Checkbutton(r, text="Live", variable=self.live).pack(side="left")
+        r.pack(fill="x", pady=(T.S(16), 0))
         apply_btn = ttk.Button(r, text="Apply", style="Primary.TButton", command=lambda: self._schedule(rec, now=True))
-        apply_btn.pack(side="left", padx=10)
+        apply_btn.pack(side="left", padx=(0, T.S(8)))
         if caps.restore.value in ("supported", "experimental"):
             ttk.Button(r, text="Restore" if rec.info.adapter == "sim" else "Return to vendor app", style="Danger.TButton",
                        command=lambda: self._restore(rec)).pack(side="left")
+        ttk.Checkbutton(r, text="Live", variable=self.live).pack(side="right")
         if not enabled:
             apply_btn.state(["disabled"])
         return c
@@ -383,8 +449,12 @@ class MainWindow:
     def _set_color(self, rec, color: str):
         d = self._draft(rec)
         d["color"] = color
-        self._color_sw.configure(bg=color)
+        self._color_sw.set(color)
         self._hex.set(color)
+        self._hue.set(color)
+        for sw in self._presets:
+            if sw.selected != (sw.color == color):
+                sw.set(sw.color, selected=sw.color == color)
         self._schedule(rec)
 
     def _schedule(self, rec, now: bool = False):
@@ -446,7 +516,7 @@ class MainWindow:
             if not s:
                 ttk.Label(r, text="—", style="Muted.TLabel").pack(side="left")
                 return
-            swatch(r, "#000000" if s.mode == "off" else (s.color.hex() if s.color else T.PANEL2), 28).pack(side="left")
+            Swatch(r, "#000000" if s.mode == "off" else (s.color.hex() if s.color else T.PANEL2), 28).pack(side="left")
             extra = f" · zones: {', '.join(f'{k} {c.hex()}' for k, c in s.zones.items())}" if s.zones else ""
             ttk.Label(r, text=f"  {s.mode}{' · ' + s.color.hex() if s.color else ''} · brightness {s.brightness}%{extra}",
                       style="Panel.TLabel").pack(side="left")
@@ -469,8 +539,9 @@ class MainWindow:
         for label, v in (("Discovery", caps.discovery), ("Display", caps.display), ("Read state", caps.read_state),
                          ("Color", caps.color), ("Brightness", caps.brightness), ("Zones", caps.zone_control),
                          ("Fan control", caps.fan_control), ("Restore", caps.restore)):
-            ttk.Label(row(c.body, label), text=T.SUPPORT_LABEL[v.value], style="Panel.TLabel",
-                      foreground=T.SUPPORT_COLOR[v.value]).pack(side="left")
+            ttk.Label(row(c.body, label), text="  " + T.SUPPORT_LABEL[v.value], style="Panel.TLabel",
+                      image=T.dot(T.SUPPORT_COLOR[v.value], 8), compound="left",
+                      foreground=T.MUTED if v.value == "unsupported" else T.TEXT).pack(side="left")
         ttk.Label(row(c.body, "Effects"), text=", ".join(caps.effects) or "—", style="Panel.TLabel").pack(side="left")
         return c
 
@@ -489,9 +560,9 @@ class MainWindow:
             else:
                 more.pack(fill="x", pady=(6, 0))
         ttk.Button(c.body, text=f"Evidence and notes ({len(i.evidence) + len(rec.caps.notes)})",
-                   command=toggle).pack(anchor="w", pady=(8, 0))
+                   command=toggle, style="Link.TButton").pack(anchor="w", pady=(T.S(8), 0))
         for title, items in (("Evidence", i.evidence), ("Notes", rec.caps.notes)):
-            ttk.Label(more, text=title.upper(), style="CardTitle.TLabel").pack(anchor="w", pady=(8, 2))
+            ttk.Label(more, text=title, style="CardTitle.TLabel").pack(anchor="w", pady=(T.S(8), T.S(2)))
             for t in items or ["—"]:
                 ttk.Label(more, text="•  " + t, style="Panel.TLabel", wraplength=400, justify="left").pack(anchor="w")
         return c
@@ -555,7 +626,7 @@ class MainWindow:
 
         top = ttk.Frame(box, style="Panel.TFrame")
         top.pack(fill="x", pady=(0, 8))
-        self._disp_big = tk.Label(top, text="--", bg=T.PANEL2, fg=T.TEXT, font=("Consolas", 18, "bold"), width=4, pady=6)
+        self._disp_big = tk.Label(top, text="--", bg=T.PANEL2, fg=T.TEXT, font=(T.TITLE[0], 22), width=4, pady=T.S(6))
         self._disp_big.pack(side="left")
         txt = ttk.Frame(top, style="Panel.TFrame")
         txt.pack(side="left", padx=10)
@@ -564,9 +635,9 @@ class MainWindow:
         self._disp_l2 = ttk.Label(txt, text="", style="Muted.TLabel")
         self._disp_l2.pack(anchor="w")
         if not st["confirmed"]:
-            b = self._banner(box, "UniRGB has not sent anything to this USB device yet. Its chip (5131:2007) is also "
+            b = self._banner(box, on_panel=True, text="UniRGB has not sent anything to this USB device yet. Its chip (5131:2007) is also "
                                   "used by relay boards and other gadgets.")
-            ttk.Button(b, text="Yes, this is my cooler display", style="Primary.TButton",
+            ttk.Button(b, text="Yes, this is my cooler display", style="Banner.Primary.TButton",
                        command=lambda: send({"confirmed": True})).pack(side="right", padx=8)
         en = tk.BooleanVar(value=st["enabled"])
         ttk.Checkbutton(row(box, "Display"), text="On", variable=en, command=lambda: send({"enabled": en.get()})).pack(side="left")
@@ -575,8 +646,8 @@ class MainWindow:
         unit = tk.StringVar(value="f" if st["fahrenheit"] else "c")
         r = row(box, "Unit")
         for v, t in (("c", "°C"), ("f", "°F")):
-            ttk.Radiobutton(r, text=t, value=v, variable=unit, command=lambda: send({"fahrenheit": unit.get() == "f"})
-                            ).pack(side="left", padx=(0, 10))
+            ttk.Radiobutton(r, text=t, value=v, variable=unit, style="Segment.TRadiobutton",
+                            command=lambda: send({"fahrenheit": unit.get() == "f"})).pack(side="left", padx=(0, T.S(4)))
         ab = {"cap84": "Hold at 84 (no flashing)", "compress": "Compress 75–100 into 75–84", "raw": "Raw (panel flashes at 85+)"}
         self._combo(row(box, "Above 84 °C"), ab, st["anti_blink"], lambda v: send({"anti_blink": v}))
         r = row(box, "CPU source")
@@ -673,7 +744,7 @@ class MainWindow:
         got = colorchooser.askcolor(color=self.sync_color, parent=self.root, title="Color for every device")[1]
         if got:
             self.sync_color = got
-            self._sync_sw.configure(bg=got)
+            self._sync_sw.set(got)
 
     def sync_all(self):
         targets = [r for r in self.records() if r.caps.writable and not r.shadowed_by and r.connection.value == "connected"]
