@@ -6,13 +6,15 @@
 |---|---|---|
 | UniRGB app (UI server, adapters, tray) | Your normal user account | You start it, or at sign-in if you chose autostart |
 | One-time setup (`UniRGB.exe --system-setup`) | Administrator, after a UAC prompt | You click **Set up now** or **Remove it** in Settings |
-| Hardware helper (`%ProgramFiles%\UniRGB Hardware Helper\UniRGB.exe --hardware-helper`) | Administrator, through a scheduled task you approved once | UniRGB needs the CPU temperature and CPU temperature is turned on |
+| Hardware helper (`%ProgramFiles%\UniRGB Hardware Helper\UniRGB.exe --hardware-helper`) | Administrator, through a scheduled task you approved once | UniRGB needs the CPU temperature or RAM lighting, and that feature is turned on in Settings |
 
 The app never runs elevated. Without the optional feature, nothing elevated is installed.
 
 ## The hardware helper
 
-* **Fixed requests:** `ping`, `cpu_temp` (AMD Zen temperature register, read-only) and `stop`. Anything else is refused.
+* **Fixed requests:** `ping`, `cpu_temp` (AMD Zen temperature register, read-only), `ram_list`, `ram_set`,
+  `ram_release` and `stop`. Anything else is refused. RAM requests name a stick by address and are accepted only
+  for ENE controllers verified in the same session (see below).
   One newline-terminated JSON request per connection, at most 4 KB.
 * **Pipe access:** `\\.\pipe\UniRGB-hardware-helper` admits only the signed-in user (read/write) and SYSTEM, at a
   security level that blocks low-integrity processes such as sandboxed browsers. It rejects remote clients, and the
@@ -26,6 +28,18 @@ The app never runs elevated. Without the optional feature, nothing elevated is i
 * **PawnIO:** the driver is installed from its official signed installer, bundled unmodified and checked against a
   pinned SHA-256 at build time.
 
+## RAM lighting
+
+* Only ENE DRAM controllers at 0x70–0x76 that answer the ENE signature and identify as a supported version with its
+  LED count are used. 0x77 is never used: controllers all share it until something remaps them, and UniRGB does not
+  remap.
+* SPD hubs (0x50–0x57) and power controllers (0x48–0x4F) cannot be addressed by the code at all.
+* Writes are limited to the direct-color registers, direct mode on/off and "apply". The command that saves to the
+  stick's own memory cannot be sent, so nothing UniRGB writes survives a power-off.
+* Every transfer holds the system-wide SMBus lock that other hardware tools use.
+* New RAM code is rehearsed in the Device Lab (`python -m devlab`) against virtual sticks with tripwires before it
+  runs on real hardware.
+
 ## What UniRGB does and never does
 
 | Does | Never does |
@@ -38,9 +52,10 @@ The app never runs elevated. Without the optional feature, nothing elevated is i
 
 ## Local attack surface
 
+UniRGB opens no network port. Its window runs in the same process as the app.
+
 | Surface | Risk | Mitigation |
 |---|---|---|
-| HTTP API on `127.0.0.1:47821` | Another local process or a web page drives your lighting | Loopback bind. Host allow-list blocks DNS rebinding. A per-run random token is required on every mutating request (web pages can't read it cross-origin). 256 KB body cap. CSP and `nosniff`. No CORS headers |
 | Hardware helper pipe | Another program asks the elevated helper to do something | Fixed request list, user-only ACL, no remote clients, read-only requests (see above) |
 | Scene import | Malformed JSON | Strict schema: version check, name pattern, color and brightness validation. An unreadable scenes file is never overwritten |
 | Razer Chroma server (not UniRGB's) | It accepts requests from any web page | Outside UniRGB's control; lighting changes are its only effect |

@@ -9,6 +9,7 @@
 - AIO pump temperature display with CPU temperature from UniRGB's own hardware helper (PawnIO)
 - First-start preferences and a one-time admin setup; no prompts on later starts
 - Tray icon, background start at sign-in, single instance, clean quit that hands devices back
+- RAM lighting on ENE controllers through the hardware helper, with the Device Lab for rehearsing hardware code
 - Vendor fallbacks: Razer Chroma SDK, OpenRGB (RAM)
 - Scenes (save, apply, import, export) and "Sync all"
 - Windows installer with a hash-pinned PawnIO bundle; the uninstaller removes the helper and its task
@@ -16,14 +17,12 @@
 
 ## Next
 
-1. **RAM lighting without OpenRGB.** A read-only SMBus probe for ENE DRAM controllers first, then writes through the
-   hardware helper, with SPD hubs and power controllers permanently excluded.
-2. **Windows Dynamic Lighting (LampArray).** A standard adapter that controls any device exposing the HID LampArray
+1. **Windows Dynamic Lighting (LampArray).** A standard adapter that controls any device exposing the HID LampArray
    usage, from any vendor.
-3. **Animated effects engine.** App-driven frames (breathing, spectrum, wave) with a frame-rate cap and a CPU budget test.
-4. **Device-change notifications** instead of polling every 15 s.
-5. **More devices** through device-support requests: each needs a read-only probe log and a real-hardware test.
-6. **Code signing and winget** so Windows stops warning on download.
+2. **Animated effects engine.** App-driven frames (breathing, spectrum, wave) with a frame-rate cap and a CPU budget test.
+3. **Device-change notifications** instead of polling every 15 s.
+4. **More devices** through device-support requests: each needs a read-only probe log and a real-hardware test.
+5. **Code signing and winget** so Windows stops warning on download.
 
 ## Known limitations
 

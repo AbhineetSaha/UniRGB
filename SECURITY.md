@@ -1,8 +1,8 @@
 # Security policy
 
 UniRGB writes to real hardware, so a bug that sends the wrong bytes to a device counts as a security issue,
-along with the usual kind: for example, a way for a web page to reach UniRGB's local server, or a way for another
-program to make UniRGB's elevated hardware helper do anything beyond its fixed list of requests.
+along with the usual kind: for example, a way for another program to make UniRGB's elevated hardware helper do anything
+beyond its fixed list of requests.
 
 ## Reporting a vulnerability
 

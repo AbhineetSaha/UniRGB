@@ -1,6 +1,6 @@
 ; Inno Setup script: builds dist\UniRGB-Setup-<version>.exe from dist\UniRGB.exe.
 ; Per-user install, no admin prompt. User settings in %APPDATA%\UniRGB are kept on uninstall.
-#define AppVersion "0.2.0"
+#define AppVersion "0.2.1"
 
 [Setup]
 AppId={{6011F4D6-4109-4C7D-A61B-BF517C51E308}

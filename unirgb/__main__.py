@@ -1,22 +1,18 @@
-"""python -m unirgb [--simulate] [--port N] [--no-window]"""
+"""python -m unirgb [--simulate] [--no-window]"""
 from __future__ import annotations
 
 import argparse
 import logging
 import os
-import shutil
 import signal
 import subprocess
 import sys
-import threading
-import webbrowser
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from .app import App, VERSION
-from .server import make_server
 
-DEFAULT_PORT = 47821   # fixed so a second launch finds the first (single instance)
+ICON = Path(__file__).parent / "ui" / "logo.ico"
 
 
 def _log_setup(verbose: bool) -> Path:
@@ -31,27 +27,22 @@ def _log_setup(verbose: bool) -> Path:
     return path
 
 
-def _open_window(url: str) -> None:
-    """Prefer an Edge/Chrome app window (no tabs or address bar); fall back to the default browser."""
-    candidates = [shutil.which("msedge"),
-                  r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-                  r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-                  r"C:\Program Files\Google\Chrome\Application\chrome.exe"]
-    for exe in candidates:
-        if exe and Path(exe).exists():
-            subprocess.Popen([exe, f"--app={url}", "--window-size=1280,860"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return
-    webbrowser.open(url)
-
-
 def _relaunch(argv: list[str]) -> None:
-    """Start a fresh UniRGB without a new window: the open page reconnects to it by itself."""
-    args = [a for a in argv if a != "--no-window"] + ["--no-window"]
+    """Start a fresh UniRGB with its window showing (used after the one-time driver setup)."""
+    args = [a for a in argv if a != "--no-window"]
     cmd = [sys.executable, *args] if getattr(sys, "frozen", False) else [sys.executable, "-m", "unirgb", *args]
     # a fresh one-file bootstrap, not a child that reuses this instance's unpacked files (deleted when we exit)
     env = {**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"}
     subprocess.Popen(cmd, env=env, close_fds=True, creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+
+
+def _raise_priority(log) -> None:
+    import ctypes   # above normal, not high: lighting stays responsive without starving games
+    k32 = ctypes.windll.kernel32
+    k32.GetCurrentProcess.restype = ctypes.c_void_p   # untyped, the 64-bit pseudo-handle is truncated
+    k32.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+    if not k32.SetPriorityClass(k32.GetCurrentProcess(), 0x8000):   # ABOVE_NORMAL_PRIORITY_CLASS
+        log.warning("could not raise process priority")
 
 
 def main(argv=None) -> int:
@@ -66,62 +57,96 @@ def main(argv=None) -> int:
         from .system_setup import main as setup_main
         return setup_main(argv[1:])
     ap = argparse.ArgumentParser(prog="unirgb", description="UniRGB unified device & RGB control center")
-    ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument("--simulate", action="store_true", help="add clearly labelled simulated devices")
-    ap.add_argument("--no-window", action="store_true", help="do not open the UI window")
+    ap.add_argument("--no-window", action="store_true", help="start in the background (tray icon only)")
     ap.add_argument("--openrgb-port", type=int, default=6742)
     ap.add_argument("--no-direct", action="store_true", help="disable direct HID adapters (vendor APIs only)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
+
+    win32 = sys.platform == "win32"
+    instance = None
+    if win32:
+        from .hostos.instance import SingleInstance
+        instance = SingleInstance()
+        if not instance.first:   # already running: bring its window forward instead
+            if not args.no_window:
+                instance.show_existing()
+            return 0
+        import ctypes
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)   # sharp text on scaled displays
+        except (AttributeError, OSError):
+            pass
+
     log_path = _log_setup(args.verbose)
     log = logging.getLogger("unirgb")
-
-    url = f"http://127.0.0.1:{args.port}/"
-    try:
-        app = App(simulate=args.simulate, direct=not args.no_direct, openrgb_port=args.openrgb_port)
-        srv = make_server(app, port=args.port)
-    except OSError:
-        log.info("UniRGB already running on %s; opening it", url)
-        if not args.no_window:
-            _open_window(url)
-        return 0
-
     log.info("UniRGB %s starting; log at %s", VERSION, log_path)
+    app = App(simulate=args.simulate, direct=not args.no_direct, openrgb_port=args.openrgb_port)
     app.rescan(full=True)
     app.start_background()
-    if sys.platform == "win32":   # above normal, not high: lighting stays responsive without starving games
-        import ctypes
-        k32 = ctypes.windll.kernel32
-        k32.GetCurrentProcess.restype = ctypes.c_void_p   # untyped, the 64-bit pseudo-handle is truncated
-        k32.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
-        if not k32.SetPriorityClass(k32.GetCurrentProcess(), 0x8000):   # ABOVE_NORMAL_PRIORITY_CLASS
-            log.warning("could not raise process priority")
-    stop = threading.Event()
-    signal.signal(signal.SIGINT, lambda *_: stop.set())
-    if hasattr(signal, "SIGBREAK"):
-        signal.signal(signal.SIGBREAK, lambda *_: stop.set())
-    threading.Thread(target=srv.serve_forever, name="http", daemon=True).start()
-    log.info("UI at %s", url)
+    if win32:
+        _raise_priority(log)
+
+    import tkinter as tk
+    from .gui import Bridge
+    from .gui.dialogs import DiagnosticsDialog, ScenesDialog, SettingsDialog
+    from .gui.window import MainWindow
+
+    root = tk.Tk()
+    if args.no_window:
+        root.withdraw()
+    if win32 and ICON.is_file():
+        root.iconbitmap(default=str(ICON))
+    bridge = Bridge(root)
+    holder = {}
+
+    def show():
+        root.deiconify()
+        root.lift()
+        root.focus_force()
+
+    win = MainWindow(root, app, bridge, VERSION, on_quit=app.request_quit,
+                     open_settings=lambda first: SettingsDialog(holder["win"], first, on_restart=lambda: app.request_quit(True)),
+                     open_scenes=lambda: ScenesDialog(holder["win"]),
+                     open_diagnostics=lambda: DiagnosticsDialog(holder["win"]))
+    holder["win"] = win
+    root.protocol("WM_DELETE_WINDOW", root.withdraw)   # closing the window keeps UniRGB running in the tray
+
     tray = None
-    if sys.platform == "win32":
+    if win32:
         from .hostos.tray import Tray
-        tray = Tray(Path(__file__).parent / "ui" / "logo.ico", f"UniRGB {VERSION} is running",
-                    on_open=lambda: _open_window(url), on_quit=app.request_quit)
+        tray = Tray(ICON, f"UniRGB {VERSION} is running", on_open=lambda: bridge.call_soon(show), on_quit=app.request_quit)
         tray.start()
-    if not args.no_window:
-        _open_window(url)
+        instance.watch(lambda: bridge.call_soon(show))
+    if not app.prefs.prefs.setup_done:   # first start: ask which features to use
+        show()
+        root.after(300, lambda: win.open_settings(True))
+
+    signal.signal(signal.SIGINT, lambda *_: app.request_quit())
+    if hasattr(signal, "SIGBREAK"):
+        signal.signal(signal.SIGBREAK, lambda *_: app.request_quit())
+
+    def watch_quit():
+        if app.quit_requested.is_set():
+            root.quit()
+        else:
+            root.after(200, watch_quit)
+    root.after(200, watch_quit)
     try:
-        while not stop.wait(0.5):
-            if app.quit_requested.is_set():
-                break
+        root.mainloop()
     finally:
         log.info("shutting down: releasing device sessions")
         if tray:
             tray.stop()
-        srv.shutdown()
         app.shutdown()
-        srv.server_close()   # free the port before the new instance binds it
+        try:
+            root.destroy()
+        except tk.TclError:
+            pass
         if app.restart_requested:
+            if instance:
+                instance.release()   # the new process must become the first instance
             _relaunch(argv)
     return 0
 

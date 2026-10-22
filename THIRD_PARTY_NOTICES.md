@@ -7,8 +7,9 @@ The Windows installer ships these components unmodified. The build checks each a
 
 | Component | Licence | Source | Used for |
 |---|---|---|---|
-| PawnIO driver installer 2.2.0 | GPL-2.0 | [namazso/PawnIO](https://github.com/namazso/PawnIO) (tag 2.2.0) | Installed by the one-time setup, only if you turn on CPU temperature |
+| PawnIO driver installer 2.2.0 | GPL-2.0 | [namazso/PawnIO](https://github.com/namazso/PawnIO) (tag 2.2.0) | Installed by the one-time setup, only if you turn on CPU temperature or RAM lighting |
 | PawnIO module `AMDFamily17.bin` 0.2.11 | LGPL-2.1 | [namazso/PawnIO.Modules](https://github.com/namazso/PawnIO.Modules) (release 0.2.11) | Loaded by the hardware helper to read the CPU temperature register |
+| PawnIO module `SmbusPIIX4.bin` 0.2.11 | LGPL-2.1 | [namazso/PawnIO.Modules](https://github.com/namazso/PawnIO.Modules) (release 0.2.11) | Loaded by the hardware helper to reach RAM lighting controllers on AMD's SMBus |
 
 ## Sources of protocol facts
 

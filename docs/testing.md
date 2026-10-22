@@ -19,7 +19,8 @@ tray icon, HID) skip themselves on other systems.
 | `tests/test_kreo.py` | Evision V2 framing and checksum, profile writes impossible, bad echoes rejected, static color, ending direct mode | Fake device |
 | `tests/test_cooler.py` | Pump-display packets, °F flag, anti-blink modes, temperature-source order, nothing sent before confirmation, blank on quit, settings validation, recovery from write errors | Fakes |
 | `tests/test_adapters.py` | Razer Chroma (sessions, encoding, heartbeat, journal and stale-session cleanup), OpenRGB (controller parsing, updates, read-back), MSI log parsing, inventory classification | Fake servers |
-| `tests/test_server.py` | Token and Host checks, apply/restore/error codes, scenes, preferences, restart | Simulated |
+| `tests/test_gui.py` | The native window against simulated devices: device list, live color, Sync all, restore, Settings, Scenes, Diagnostics, every device page | Simulated (needs a display) |
+| `tests/test_app.py` | Last colors re-applied after a restart or reconnect, restart flags, single instance | Simulated |
 | `tests/test_prefs.py` | Preference validation and atomic saves | – |
 | `tests/test_system_setup.py` | Task XML, PawnIO install/skip/start decisions, a half-removed PawnIO, removal of only the setup's own files, stale-helper detection | Fakes |
 | `tests/test_hardware_helper.py` | Temperature decoding, request handling, a real named-pipe round trip including `stop`, fast give-up without a helper | Real pipe (Windows) |

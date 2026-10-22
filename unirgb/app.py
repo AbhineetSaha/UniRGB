@@ -15,6 +15,7 @@ from .adapters.kreo_direct import KreoDirectAdapter
 from .adapters.msi_direct import MsiDirectAdapter
 from .adapters.msi_mystic import MysticLightMonitor
 from .adapters.openrgb import OpenRGBAdapter
+from .adapters.ram_ene import RamEneAdapter
 from .adapters.razer_chroma import RazerChromaAdapter
 from .adapters.razer_direct import RazerDirectAdapter
 from .adapters.simulated import SimulatedAdapter
@@ -26,7 +27,7 @@ from .hostos import windows_hid, windows_system
 from .prefs import PrefsStore
 
 log = logging.getLogger("unirgb")
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 
 class HidCache:
@@ -67,7 +68,8 @@ class App:
                 cpu = lambda: (sensors.read_hw_helper(self._start_helper) or sensors.read_lhm_cpu()
                                or sensors.read_helper_file())
                 adapters = [CoolerDisplayAdapter(self.hid.get, cpu_reader=cpu), KreoDirectAdapter(self.hid.get), RazerDirectAdapter(self.hid.get, process_provider=procs),
-                            MsiDirectAdapter(self.hid.get, process_provider=procs, board_provider=board)] + adapters
+                            MsiDirectAdapter(self.hid.get, process_provider=procs, board_provider=board),
+                            RamEneAdapter(enabled=lambda: self.prefs.prefs.ram_lighting, start_helper=self._start_helper)] + adapters
             if simulate:
                 adapters.append(SimulatedAdapter())
         self.orch = Orchestrator(adapters)
@@ -86,10 +88,10 @@ class App:
         self.last_scan_ms: float = 0.0
 
     def _start_helper(self) -> None:
-        """Start the privileged helper through its task: only if the user enabled it, at most every 30 s."""
+        """Start the privileged helper through its task: only if the user enabled a feature that needs it, at most every 30 s."""
         now = time.monotonic()
         # without the driver the helper only fails; not counting that as a start lets it launch right after setup
-        if (self.prefs.prefs.cpu_temperature and now - self._helper_started > 30
+        if (self.prefs.prefs.needs_driver and now - self._helper_started > 30
                 and system_setup.driver_state() != "not-installed"):
             self._helper_started = now
             system_setup.start_helper()
@@ -153,6 +155,6 @@ class App:
     def shutdown(self) -> None:
         self._stop.set()
         self.orch.shutdown()
-        if sys.platform == "win32" and self.prefs.prefs.cpu_temperature:   # the elevated helper quits with us
+        if sys.platform == "win32" and self.prefs.prefs.needs_driver:   # the elevated helper quits with us
             from .hostos import pipe
             pipe.request({"op": "stop"}, timeout_s=1.0)

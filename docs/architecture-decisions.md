@@ -9,11 +9,15 @@ Short records of the decisions that shape UniRGB: the options, what was chosen, 
   to audit or update beyond Python itself. PyInstaller packs it into one `.exe` for users.
 * **Trade-off:** no native UI toolkit beyond Tk (see ADR-2), and Windows APIs are bound by hand through `ctypes`.
 
-## ADR-2 · UI: a local web page in an Edge `--app` window
-* **Options:** Tkinter · local HTML in an Edge/Chrome app window · pywebview (a dependency).
-* **Decision:** HTML/CSS/JS served on loopback and opened with `msedge --app`. A modern UI with no dependencies; Edge
-  ships with Windows, and any browser works as a fallback.
-* **Trade-off:** a loopback HTTP surface that needs hardening (ADR-6).
+## ADR-2 · UI: a native Tk window
+* **Options:** Tk (standard library) · a local web page in an Edge window · an embedded WebView2 (needs Microsoft's
+  proprietary loader DLL) · a C#/WPF rewrite.
+* **History:** v0.1–v0.2 served a web page on `127.0.0.1` and opened it in an Edge app window. Users read that as a
+  browser wrapper, and it meant a local HTTP server that had to be hardened against other programs and web pages.
+* **Decision:** a native Tk window in the same process, calling the application directly. No browser, no local
+  server, no new dependency, nothing proprietary. Blocking device calls run on worker threads and report back to the
+  Tk thread through a queue (`gui.Bridge`); Tk is only touched on its own thread.
+* **Trade-off:** Tk widgets are plainer than a web page; the dark theme is built from ttk styles.
 
 ## ADR-3 · Direct HID first, vendor APIs as fallback
 * **Options:** vendor APIs only (Chroma SDK, MSI SDK) · OpenRGB as a backend · own implementations of documented protocols.
@@ -35,10 +39,10 @@ Short records of the decisions that shape UniRGB: the options, what was chosen, 
   hung adapter blocks only itself. Coalescing keeps slider drags from queueing hundreds of writes (a test sends 50 queued
   writes and fewer than 6 reach the adapter). asyncio was rejected because the `ctypes` calls block anyway.
 
-## ADR-6 · Loopback hardening
-* Bind `127.0.0.1`, allow-list the Host header (DNS rebinding), embed a per-run random token in the page and require it
-  on every mutating request (CSRF), cap request bodies at 256 KB, and send a CSP. **Why:** some vendor servers on the
-  same machine accept requests from any web page, and UniRGB must not add another open door.
+## ADR-6 · No local network surface
+* Since the native window (ADR-2), UniRGB listens on no port. The only inter-process channel is the hardware helper's
+  named pipe (ADR-9). Earlier versions ran a loopback HTTP server hardened with a Host allow-list, a per-run token,
+  a body cap and a CSP; removing the server removed that whole class of risk.
 
 ## ADR-7 · Cross-adapter ownership via `physical_key`
 * The same hardware can appear through several adapters (inventory, direct HID, Chroma, OpenRGB). The registry groups
@@ -46,7 +50,7 @@ Short records of the decisions that shape UniRGB: the options, what was chosen, 
   are marked `shadowed_by` and refuse writes, so two UniRGB paths never write the same device.
 
 ## ADR-8 · Lifecycle: single instance, background, tray icon
-* A fixed port with address reuse off gives a single instance; a second launch opens the first one's window.
+* A named mutex gives a single instance; a second launch signals a named event, and the running instance shows its window.
 * Closing the window keeps lighting applied; **Quit** (button or tray menu) hands devices back. The tray icon is plain
   Win32 through `ctypes` (`hostos/tray.py`) and re-adds itself when Explorer restarts.
 
@@ -58,13 +62,13 @@ Short records of the decisions that shape UniRGB: the options, what was chosen, 
 * **Decision:** the user opts in at first start. A one-time elevated setup installs the open-source PawnIO driver
   (bundled, hash-pinned), copies the helper to an admin-only folder in Program Files, and registers an on-demand task
   with no triggers. The app starts it with `schtasks /run`, so later starts need no prompt.
-* **Helper rules:** fixed arguments; modules loaded only from its own folder; requests limited to `ping`, `cpu_temp`
-  and `stop`; a named pipe whose ACL admits only the signed-in user and SYSTEM, rejects remote clients and refuses a
+* **Helper rules:** fixed arguments; modules loaded only from its own folder; requests limited to `ping`,
+  `cpu_temp`, `ram_list`, `ram_set`, `ram_release` and `stop`; a named pipe whose ACL admits only the signed-in user and SYSTEM, rejects remote clients and refuses a
   second server; exits on `stop` or after 60 s idle.
 * **Trade-off:** an app update makes the Program Files copy stale, which costs one prompt to refresh. Settings detects
   this by size and timestamp and asks.
 
 ## ADR-10 · First-start preferences
 * Features that need the driver are opt-in and saved in `prefs.json`. Only known keys and booleans are accepted, and
-  features that aren't available yet (RAM) can't be switched on. The app starts the helper only when the preference is
+  features that aren't available yet can't be switched on. The app starts the helper only when the preference is
   on and the driver is installed.

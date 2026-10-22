@@ -103,8 +103,8 @@ class InventoryAdapter(DeviceAdapter):
                            evidence=[f"CIM part numbers: {', '.join(parts)}",
                                      "MSI Mystic Light log lists a 'DDR5 DIMM' zone"]),
                 Capabilities(color=Support.BLOCKED,
-                             notes=["DIMM lighting is driven over SMBus. UniRGB itself never writes to SMBus.",
-                                    "To control RAM lighting, run OpenRGB with its SDK server: the 'openrgb' adapter "
-                                    "then shows your RAM as a controllable entry."]),
+                             notes=["This entry only lists the installed memory.",
+                                    "To control RAM lighting, turn on RAM lighting in Settings: each stick with a "
+                                    "supported ENE controller then appears as its own entry."]),
                 Connection.MONITOR_ONLY))
         return out

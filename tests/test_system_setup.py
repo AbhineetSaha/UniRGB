@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -51,7 +52,8 @@ class SetupTests(unittest.TestCase):
         run, states = FakeRun(), iter(["not-installed", "running"])
         steps = ss.enable(SID, self.exe, run=run, driver=lambda: next(states), dst=self.dst)
         self.assertEqual(run.calls[0][1:], ["-install", "-silent"])
-        self.assertEqual(run.calls[1][:2], ["schtasks", "/create"])
+        self.assertEqual([c[:2] for c in run.calls[1:]], [["schtasks", "/end"], ["powershell", "-NoProfile"],
+                                                          ["schtasks", "/create"]])
         self.assertTrue((self.dst / "UniRGB.exe").is_file() and (self.dst / "modules" / "SmbusPIIX4.bin").is_file())
         self.assertIn("installed PawnIO", steps[0])
 
@@ -70,10 +72,28 @@ class SetupTests(unittest.TestCase):
         (self.dst / "someone-elses.txt").write_text("keep")
         run = FakeRun()
         ss.disable(run=run, dst=self.dst)
-        self.assertEqual([c[:2] for c in run.calls], [["schtasks", "/end"], ["schtasks", "/delete"]],
-                         "the running helper is ended before its files are deleted")
+        self.assertEqual([c[:2] for c in run.calls], [["schtasks", "/end"], ["powershell", "-NoProfile"],
+                                                      ["schtasks", "/delete"]],
+                         "the running helper is stopped before its files are deleted")
+        self.assertIn(str(self.dst / "UniRGB.exe"), run.calls[1][-1], "only the helper's own exe is closed")
         self.assertFalse((self.dst / "UniRGB.exe").exists())
         self.assertTrue((self.dst / "someone-elses.txt").exists())
+
+    def test_refresh_waits_for_a_running_helper_to_release_its_exe(self):
+        # what happened on a real PC: the running helper kept UniRGB.exe locked (WinError 32)
+        ss.enable(SID, self.exe, run=FakeRun(), driver=lambda: "running", dst=self.dst)
+        real_copy, fails = ss.shutil.copy2, [2]
+
+        def locked_copy(src, dst):
+            if Path(dst).name == "UniRGB.exe" and fails[0]:
+                fails[0] -= 1
+                raise PermissionError(32, "The process cannot access the file because it is being used by another process")
+            return real_copy(src, dst)
+        run = FakeRun()
+        with mock.patch.object(ss.shutil, "copy2", locked_copy), mock.patch.object(ss.time, "sleep"):
+            ss.enable(SID, self.exe, run=run, driver=lambda: "running", dst=self.dst)
+        self.assertEqual(sum(c[:2] == ["schtasks", "/end"] for c in run.calls), 3, "ended up front, then once per retry")
+        self.assertEqual((self.dst / "UniRGB.exe").read_bytes(), b"exe")
 
     def test_disable_leaves_no_folder_behind(self):
         ss.enable(SID, self.exe, run=FakeRun(), driver=lambda: "running", dst=self.dst)

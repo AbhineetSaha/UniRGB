@@ -1,3 +1,4 @@
+import time
 import unittest
 
 from tests.fakes import FakeHid
@@ -71,6 +72,20 @@ class AdapterTests(unittest.TestCase):
         self.a.apply(self.dev.info.id, LightingState(color=Color(255, 0, 0)))
         self.assertTrue(self.a.restore(self.dev.info.id).ok)
         self.assertEqual(self.kb.sent[-1][3], ev.END_DYNAMIC_COLORS)
+
+    def test_keepalive_resends_every_slot(self):
+        a = KreoDirectAdapter(lambda: [HID], open_device=lambda i: self.kb, keepalive_s=0.01)
+        [dev] = a.discover()
+        try:
+            a.apply(dev.info.id, LightingState(color=Color(255, 0, 0)))
+            self.kb.sent.clear()
+            deadline = time.monotonic() + 2
+            while len(self.kb.sent) < 7 and time.monotonic() < deadline:
+                time.sleep(0.01)
+            offsets = {p[5] | (p[6] << 8) for p in self.kb.sent[:7]}
+            self.assertEqual(offsets, set(range(0, 128 * 3, ev.CHUNK)))   # not just the first chunk
+        finally:
+            a.shutdown()
 
 
 if __name__ == "__main__":

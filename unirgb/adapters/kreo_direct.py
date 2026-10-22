@@ -117,8 +117,9 @@ class KreoDirectAdapter(DeviceAdapter):
                 if self._buffer is None or self._info is None:
                     return
                 try:
-                    # re-send real color data (not a write to a "blank" slot that may be a real key here)
-                    self._transport().query(ev.SEND_DYNAMIC_COLORS, 0, ev.CHUNK, self._buffer[:ev.CHUNK])
+                    # the whole buffer: after a missed refresh the keyboard drops back to its stored effect,
+                    # and re-sending only the first chunk left the other keys showing that effect
+                    self._transport().send_dynamic(self._buffer)
                     self.keepalive_errors = 0
                 except Exception as e:
                     self.keepalive_errors += 1

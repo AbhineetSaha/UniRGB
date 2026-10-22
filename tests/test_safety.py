@@ -1,4 +1,8 @@
-"""Guards for user-imposed safety rules. Fails the build if they are violated."""
+"""Guards for user-imposed safety rules. Fails the build if they are violated.
+
+The app (unirgb/) never contains SMBus primitives. RAM is written only by the hardware helper through
+unirgb_smbus, whose fences are tested in tests/test_smbus.py and tests/test_devlab.py.
+"""
 import re
 import unittest
 from pathlib import Path
@@ -15,7 +19,7 @@ class RamNoWriteRule(unittest.TestCase):
             for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
                 if FORBIDDEN.search(line) and not line.lstrip().startswith("#"):
                     hits.append(f"{p.relative_to(ROOT)}:{i}: {line.strip()}")
-        self.assertEqual(hits, [], "RAM must never be written (user rule). Offending lines:\n" + "\n".join(hits))
+        self.assertEqual(hits, [], "SMBus code belongs in unirgb_smbus, behind its fences. Offending lines:\n" + "\n".join(hits))
 
     def test_dram_entry_is_read_only(self):
         from unirgb.adapters.inventory import InventoryAdapter
