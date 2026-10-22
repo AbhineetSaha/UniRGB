@@ -22,7 +22,6 @@ CHUNK = PACKET - 8
 READ_CAPABILITIES, READ_CONFIG = 0x03, 0x05
 SEND_DYNAMIC_COLORS, END_DYNAMIC_COLORS = 0x12, 0x13
 ALLOWED = {READ_CAPABILITIES, READ_CONFIG, SEND_DYNAMIC_COLORS, END_DYNAMIC_COLORS}
-BLANK_SPACE = 6   # unused key slot; a 1-byte write there refreshes direct mode
 
 
 class EvisionError(Exception):
@@ -75,9 +74,6 @@ class EvisionTransport:
         for off in range(0, len(buffer), CHUNK):
             part = buffer[off:off + CHUNK]
             self.query(SEND_DYNAMIC_COLORS, off, len(part), part)
-
-    def refresh(self) -> None:
-        self.query(SEND_DYNAMIC_COLORS, BLANK_SPACE * 3, 1, b"\x00")
 
     def end(self) -> None:
         self.query(END_DYNAMIC_COLORS)
