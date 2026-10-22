@@ -18,9 +18,11 @@ class Dialog(tk.Toplevel):
         self.configure(bg=T.PANEL)
         self.transient(master)
         self.resizable(True, True)
-        self.minsize(width, 200)
-        self.body = ttk.Frame(self, style="Panel.TFrame", padding=18)
+        self.minsize(T.S(width), T.S(200))
+        self.body = ttk.Frame(self, style="Panel.TFrame", padding=(T.S(24), T.S(20)))
         self.body.pack(fill="both", expand=True)
+        ttk.Label(self.body, text=title, style="Panel.TLabel", font=T.SUBTITLE).pack(anchor="w", pady=(0, T.S(8)))
+        T.title_bar(self)
         self.bind("<Escape>", lambda e: self.destroy())
         self.after(10, self._show)
 
@@ -35,7 +37,7 @@ class Dialog(tk.Toplevel):
     def text(self, parent, text, muted=True, wrap=560, **kw):
         lbl = ttk.Label(parent, text=text, style="Muted.TLabel" if muted else "Panel.TLabel", wraplength=wrap,
                         justify="left", **kw)
-        lbl.pack(anchor="w", pady=(0, 6))
+        lbl.pack(anchor="w", pady=(0, T.S(8)))
         return lbl
 
 
@@ -56,19 +58,19 @@ class SettingsDialog(Dialog):
                 ("RAM lighting", self.ram, "Needs driver" if P["available"]["ram_lighting"] else "Coming soon", T.WARN,
                  P["available"]["ram_lighting"])):
             r = ttk.Frame(self.body, style="Panel.TFrame")
-            r.pack(fill="x", pady=4)
+            r.pack(fill="x", pady=T.S(5))
             cb = ttk.Checkbutton(r, text=text, variable=var)
             cb.pack(side="left")
             if not enabled:
                 cb.state(["disabled"])
-            ttk.Label(r, text=chip, style="Panel.TLabel", foreground=color, font=T.SMALL).pack(side="right")
+            ttk.Label(r, text=chip, style=T.chip_style(color, T.PANEL)).pack(side="right")
         if P["available"]["ram_lighting"]:
             self.text(self.body, "RAM lighting supports ENE controllers (for example G.Skill and other DDR5 kits) on AMD "
                                  "boards. Colors are never saved to the sticks.")
         self.status = ttk.Frame(self.body, style="Panel.TFrame")
-        self.status.pack(fill="x", pady=(8, 0))
+        self.status.pack(fill="x", pady=(T.S(8), 0))
         r = ttk.Frame(self.body, style="Panel.TFrame")
-        r.pack(fill="x", pady=(14, 0))
+        r.pack(fill="x", pady=(T.S(18), 0))
         ttk.Button(r, text="Continue" if first else "Save", style="Primary.TButton", command=self.save).pack(side="right")
         self.load_status()
 
@@ -99,13 +101,13 @@ class SettingsDialog(Dialog):
             self._banner("UniRGB's background helper is still installed but nothing uses it." + fail, "Remove it",
                          lambda: self.run_setup(False))
         elif p.needs_driver:
-            ttk.Label(self.status, text="●  Background helper ready", style="Panel.TLabel", foreground=T.OK).pack(anchor="w")
+            ttk.Label(self.status, text="Background helper ready", style=T.chip_style(T.OK, T.PANEL)).pack(anchor="w")
 
     def _banner(self, text, button, command):
-        b = tk.Frame(self.status, bg="#2a2416", highlightbackground="#5c4a1e", highlightthickness=1)
+        b = ttk.Frame(self.status, style="Panel.Banner.TFrame", padding=(T.S(14), T.S(8)))
         b.pack(fill="x")
-        tk.Label(b, text=text, bg="#2a2416", fg=T.TEXT, wraplength=420, justify="left").pack(side="left", padx=12, pady=10)
-        ttk.Button(b, text=button, style="Primary.TButton", command=command).pack(side="right", padx=10)
+        ttk.Label(b, text=text, style="Banner.TLabel", wraplength=T.S(400), justify="left").pack(side="left", pady=T.S(4))
+        ttk.Button(b, text=button, style="Banner.Primary.TButton", command=command).pack(side="right", padx=(T.S(10), 0))
 
     def save(self):
         try:
@@ -153,18 +155,18 @@ class ScenesDialog(Dialog):
         self.text(self.body, f"A scene saves the color you last asked for on each controllable device. "
                              f"Stored in {self.app.scenes.path}.")
         r = ttk.Frame(self.body, style="Panel.TFrame")
-        r.pack(fill="x", pady=(4, 10))
+        r.pack(fill="x", pady=(T.S(4), T.S(12)))
         self.name = tk.StringVar()
         e = ttk.Entry(r, textvariable=self.name)
         e.pack(side="left", fill="x", expand=True)
         e.bind("<Return>", lambda _e: self.save())
-        ttk.Button(r, text="Save current", style="Primary.TButton", command=self.save).pack(side="left", padx=(8, 0))
+        ttk.Button(r, text="Save current", style="Primary.TButton", command=self.save).pack(side="left", padx=(T.S(8), 0))
         self.list = ttk.Frame(self.body, style="Panel.TFrame")
         self.list.pack(fill="both", expand=True)
         r = ttk.Frame(self.body, style="Panel.TFrame")
-        r.pack(fill="x", pady=(12, 0))
+        r.pack(fill="x", pady=(T.S(14), 0))
         ttk.Button(r, text="Export JSON", command=self.export).pack(side="left")
-        ttk.Button(r, text="Import JSON", command=self.import_).pack(side="left", padx=8)
+        ttk.Button(r, text="Import JSON", command=self.import_).pack(side="left", padx=T.S(8))
         self.render()
 
     def render(self):
@@ -176,12 +178,15 @@ class ScenesDialog(Dialog):
         if not scenes:
             self.text(self.list, "No scenes yet.")
         for name in sorted(scenes):
-            r = ttk.Frame(self.list, style="Panel.TFrame")
-            r.pack(fill="x", pady=3)
-            ttk.Label(r, text=name, style="Panel.TLabel").pack(side="left")
+            r = ttk.Frame(self.list, style="Panel.Card.TFrame", padding=(T.S(16), T.S(10)))
+            r.pack(fill="x", pady=T.S(3))
+            for st in list(scenes[name].values())[:6]:   # a peek at the scene's colors
+                c = "#000000" if st.mode == "off" else (st.color.hex() if st.color else T.PANEL2)
+                ttk.Label(r, image=T.box(c, T.mix(c, T.TEXT, .3), 4, 16), style="Panel.TLabel").pack(side="left", padx=(0, T.S(3)))
+            ttk.Label(r, text=name, style="Panel.TLabel", font=T.CARD_TITLE).pack(side="left", padx=(T.S(8), 0))
             ttk.Label(r, text=f"  {len(scenes[name])} device(s)", style="Muted.TLabel").pack(side="left")
             ttk.Button(r, text="Delete", style="Danger.TButton", command=lambda n=name: self.delete(n)).pack(side="right")
-            ttk.Button(r, text="Apply", command=lambda n=name: self.apply(n)).pack(side="right", padx=6)
+            ttk.Button(r, text="Apply", command=lambda n=name: self.apply(n)).pack(side="right", padx=T.S(6))
 
     def save(self):
         name = self.name.get().strip()
@@ -236,12 +241,12 @@ class DiagnosticsDialog(Dialog):
     def __init__(self, win):
         super().__init__(win.root, "Diagnostics", 820)
         app = win.app
-        ttk.Label(self.body, text="ADAPTERS", style="CardTitle.TLabel").pack(anchor="w")
+        ttk.Label(self.body, text="Adapters", style="CardTitle.TLabel").pack(anchor="w")
         t = self._table(("Adapter", "Up", "Detail", "Control path"), (110, 50, 260, 380), 7)
         for name, h in app.orch.health().items():
             t.insert("", "end", values=(name, "yes" if h.available else "no", h.detail,
                                         app.orch.adapters[name].control_path))
-        ttk.Label(self.body, text="HID COLLECTIONS (QUERY-ONLY)", style="CardTitle.TLabel").pack(anchor="w", pady=(14, 0))
+        ttk.Label(self.body, text="HID collections (query-only)", style="CardTitle.TLabel").pack(anchor="w", pady=(T.S(16), 0))
         if app.hid.error:
             self.text(self.body, app.hid.error, muted=False)
         t = self._table(("VID:PID", "MI", "Usage", "In/Out/Feat", "Manufacturer / product"), (90, 40, 90, 100, 470), 12)
@@ -252,11 +257,9 @@ class DiagnosticsDialog(Dialog):
                                         " / ".join(x for x in (i.manufacturer, i.product) if x)))
 
     def _table(self, cols, widths, height):
-        style = ttk.Style(self)
-        style.configure("Diag.Treeview", rowheight=22, background=T.PANEL2, fieldbackground=T.PANEL2)
         t = ttk.Treeview(self.body, columns=cols, show="headings", height=height, style="Diag.Treeview")
         for c, w in zip(cols, widths):
             t.heading(c, text=c)
             t.column(c, width=w, anchor="w")
-        t.pack(fill="both", expand=True, pady=(4, 0))
+        t.pack(fill="both", expand=True, pady=(T.S(6), 0))
         return t
