@@ -3,7 +3,7 @@
 The UI starts this once, elevated (one UAC prompt), as `UniRGB.exe --system-setup enable|disable`.
 
 enable:  installs the PawnIO driver if it is missing (official installer bundled next to UniRGB.exe),
-         copies UniRGB.exe and the PawnIO modules into HELPER_DIR under Program Files, and registers
+         copies UniRGB.exe, its _internal folder and the PawnIO modules into HELPER_DIR under Program Files, and registers
          a scheduled task that runs that copy with highest privileges when the app asks for it.
          Later starts launch the helper through the task, with no prompt.
 disable: deletes the task and the files it created. PawnIO stays installed: OpenRGB and
@@ -74,8 +74,8 @@ def driver_state(service_state=windows_system.service_state, dll: Path = pawnio.
 
 
 def _end_helper(run, dst: Path) -> None:
-    """Stop a running helper. Ending the task alone is not enough: the one-file exe runs a child process that
-    outlives it and keeps UniRGB.exe locked. So: ask it over the pipe, end the task, then close any process still
+    """Stop a running helper. Ending the task alone is not enough: a one-file helper (before 0.3.0) runs a child
+    process that outlives it and keeps UniRGB.exe locked. So: ask it over the pipe, end the task, then close any process still
     running the helper's own exe (matched by full path, never the UniRGB app)."""
     if dst == helper_dir():   # the real helper; tests use other folders and must not stop it
         try:
@@ -130,6 +130,12 @@ def enable(user_sid: str, src_exe: Path, run=_run, driver=driver_state, dst: Pat
     for src, target in [(src_exe, dst / "UniRGB.exe"),
                         *((m, dst / "modules" / m.name) for m in sorted((bundle / "modules").glob("*.bin")))]:
         _while_running(lambda: shutil.copy2(src, target), lambda: _end_helper(run, dst), wait_tries)
+    internal = src_exe.parent / "_internal"   # the one-folder build keeps Python and UniRGB's code here
+    if internal.is_dir():
+        def replace_internal():
+            shutil.rmtree(dst / "_internal", ignore_errors=True)   # no stale files from an older version
+            shutil.copytree(internal, dst / "_internal", dirs_exist_ok=True)
+        _while_running(replace_internal, lambda: _end_helper(run, dst), wait_tries)
     steps.append(f"copied the helper to {dst}")
 
     with tempfile.TemporaryDirectory() as tmp:   # the elevated process's own temp folder
@@ -152,6 +158,11 @@ def disable(run=_run, dst: Path | None = None, wait_tries: int = 20) -> list[str
             _while_running(lambda: f.unlink(missing_ok=True), lambda: _end_helper(run, dst), wait_tries)
         except PermissionError:
             pass   # left behind; the folder stays and Settings still shows it
+    if (dst / "_internal").is_dir():
+        try:
+            _while_running(lambda: shutil.rmtree(dst / "_internal"), lambda: _end_helper(run, dst), wait_tries)
+        except PermissionError:
+            pass
     for d in (dst / "modules", dst):
         try:
             d.rmdir()
