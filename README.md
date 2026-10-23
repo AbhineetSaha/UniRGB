@@ -63,12 +63,16 @@ Python 3.11 or newer, no packages to install (the window uses Tk, which ships wi
 ## Build the Windows installer
 
 ```bash
-pip install pyinstaller
+winget install Microsoft.VisualStudio.2022.BuildTools --override "--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 winget install JRSoftware.InnoSetup
+tools\install-pyinstaller.cmd
 tools\build-windows.cmd
 ```
 
-This builds `dist\UniRGB.exe` (one file, no Python needed) and `dist\UniRGB-Setup-<version>.exe`. The build downloads
+`install-pyinstaller.cmd` installs PyInstaller with its bootloader compiled on your machine (that's why it needs the
+C++ build tools). The stock prebuilt bootloader is shared with a lot of malware, so antivirus programs flag apps built
+with it far more often. The build makes `dist\UniRGB\` (`UniRGB.exe` with its `_internal` folder, no Python needed)
+and `dist\UniRGB-Setup-<version>.exe`. The build downloads
 PawnIO's official installer and module and refuses to continue unless their SHA-256 hashes match the pinned values in
 `tools/fetch_pawnio.py`.
 

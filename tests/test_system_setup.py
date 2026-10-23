@@ -30,6 +30,8 @@ class SetupTests(unittest.TestCase):
         self.exe.write_bytes(b"exe")
         (self.app / "pawnio" / "PawnIO_setup.exe").write_bytes(b"setup")
         (self.app / "pawnio" / "modules" / "SmbusPIIX4.bin").write_bytes(b"mod")
+        (self.app / "_internal" / "lib").mkdir(parents=True)
+        (self.app / "_internal" / "lib" / "python3.dll").write_bytes(b"dll")
         self.dst = root / "Program Files" / "UniRGB Hardware Helper"
 
     def tearDown(self):
@@ -55,7 +57,15 @@ class SetupTests(unittest.TestCase):
         self.assertEqual([c[:2] for c in run.calls[1:]], [["schtasks", "/end"], ["powershell", "-NoProfile"],
                                                           ["schtasks", "/create"]])
         self.assertTrue((self.dst / "UniRGB.exe").is_file() and (self.dst / "modules" / "SmbusPIIX4.bin").is_file())
+        self.assertTrue((self.dst / "_internal" / "lib" / "python3.dll").is_file(), "the one-folder build runs from its own copy")
         self.assertIn("installed PawnIO", steps[0])
+
+    def test_refresh_replaces_the_internal_folder(self):
+        ss.enable(SID, self.exe, run=FakeRun(), driver=lambda: "running", dst=self.dst)
+        (self.dst / "_internal" / "old-version.pyd").write_bytes(b"old")
+        ss.enable(SID, self.exe, run=FakeRun(), driver=lambda: "running", dst=self.dst)
+        self.assertFalse((self.dst / "_internal" / "old-version.pyd").exists())
+        self.assertTrue((self.dst / "_internal" / "lib" / "python3.dll").is_file())
 
     def test_enable_skips_installer_when_driver_present(self):
         run = FakeRun()

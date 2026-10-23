@@ -27,19 +27,27 @@ jobs:
       - run: python -m unittest discover -s tests -t .
 
       - name: Install build tools
+        shell: cmd
         run: |
-          pip install pyinstaller
+          call tools\install-pyinstaller.cmd || exit /b 1
           choco install innosetup -y --no-progress
 
       - name: Build
         shell: cmd
         run: tools\build-windows.cmd
 
+      - name: Portable zip
+        shell: bash
+        working-directory: dist
+        run: 7z a "UniRGB-${GITHUB_REF_NAME#v}-portable.zip" ./UniRGB/*
+
       # sha256sum fails if build-windows.cmd skipped the installer, so a release never ships without it.
       - name: Checksums
         shell: bash
         working-directory: dist
-        run: sha256sum UniRGB.exe "UniRGB-Setup-${GITHUB_REF_NAME#v}.exe" > SHA256SUMS.txt && cat SHA256SUMS.txt
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          sha256sum "UniRGB-Setup-$v.exe" "UniRGB-$v-portable.zip" > SHA256SUMS.txt && cat SHA256SUMS.txt
 
       - name: Publish release
         shell: bash
@@ -47,4 +55,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >
           gh release create "$GITHUB_REF_NAME" --title "UniRGB $GITHUB_REF_NAME" --generate-notes
-          "dist/UniRGB-Setup-${GITHUB_REF_NAME#v}.exe" dist/UniRGB.exe dist/SHA256SUMS.txt
+          "dist/UniRGB-Setup-${GITHUB_REF_NAME#v}.exe" "dist/UniRGB-${GITHUB_REF_NAME#v}-portable.zip" dist/SHA256SUMS.txt

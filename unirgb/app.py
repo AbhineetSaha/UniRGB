@@ -27,7 +27,7 @@ from .hostos import windows_hid, windows_system
 from .prefs import PrefsStore
 
 log = logging.getLogger("unirgb")
-VERSION = "0.2.1"
+VERSION = "0.3.0"
 
 
 class HidCache:

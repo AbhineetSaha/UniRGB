@@ -1,6 +1,6 @@
-; Inno Setup script: builds dist\UniRGB-Setup-<version>.exe from dist\UniRGB.exe.
+; Inno Setup script: builds dist\UniRGB-Setup-<version>.exe from the dist\UniRGB folder.
 ; Per-user install, no admin prompt. User settings in %APPDATA%\UniRGB are kept on uninstall.
-#define AppVersion "0.2.1"
+#define AppVersion "0.3.0"
 
 [Setup]
 AppId={{6011F4D6-4109-4C7D-A61B-BF517C51E308}
@@ -20,12 +20,16 @@ SolidCompression=yes
 WizardStyle=modern
 CloseApplications=yes
 
+[InstallDelete]
+; files an older version left in _internal must not mix with this version's
+Type: filesandordirs; Name: "{app}\_internal"
+
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; Flags: unchecked
 Name: "autostart"; Description: "Start UniRGB in the background when I sign in"
 
 [Files]
-Source: "..\dist\UniRGB.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\UniRGB\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\LICENSE"; DestDir: "{app}"
 Source: "..\README.md"; DestDir: "{app}"
 ; PawnIO installer, module and licences, staged by tools\fetch_pawnio.py (hash-checked). Used only by the
